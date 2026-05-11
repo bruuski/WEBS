@@ -1,14 +1,18 @@
-"""TuneSpace -- a MySpace-flavored music rating blog."""
+"""TuneSpace -- music rating + reviews + Spotify."""
 import os
 import re
+import time
+import base64
 import sqlite3
 import secrets
 import hashlib
+import urllib.parse
 from datetime import datetime
 from functools import wraps
 
+import requests
 from flask import (
-    Flask, g, request, redirect, url_for, session,
+    Flask, g, request, redirect, url_for, session, jsonify,
     render_template, flash, abort,
 )
 
@@ -16,7 +20,44 @@ APP_ROOT = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(APP_ROOT, "tunespace.db")
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("TUNESPACE_SECRET", "glitter-gel-pen-2006")
+app.secret_key = os.environ.get("TUNESPACE_SECRET", "dev-secret-change-me")
+
+
+# ---------- Spotify config ----------
+
+SPOTIFY_CLIENT_ID     = os.environ.get("SPOTIFY_CLIENT_ID", "")
+SPOTIFY_CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
+SPOTIFY_REDIRECT_URI  = os.environ.get("SPOTIFY_REDIRECT_URI",
+                                       "http://127.0.0.1:5000/spotify/callback")
+SPOTIFY_SCOPES = "user-read-email user-top-read user-read-currently-playing user-read-recently-played"
+
+
+def spotify_configured():
+    return bool(SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET)
+
+
+_app_token = {"value": None, "expires_at": 0}
+
+
+def get_app_spotify_token():
+    """Client-credentials token for server-side search."""
+    if not spotify_configured():
+        return None
+    if _app_token["value"] and _app_token["expires_at"] > time.time() + 30:
+        return _app_token["value"]
+    creds = base64.b64encode(f"{SPOTIFY_CLIENT_ID}:{SPOTIFY_CLIENT_SECRET}".encode()).decode()
+    r = requests.post(
+        "https://accounts.spotify.com/api/token",
+        headers={"Authorization": f"Basic {creds}"},
+        data={"grant_type": "client_credentials"},
+        timeout=8,
+    )
+    if not r.ok:
+        return None
+    d = r.json()
+    _app_token["value"] = d["access_token"]
+    _app_token["expires_at"] = time.time() + d.get("expires_in", 3600)
+    return _app_token["value"]
 
 
 # ---------- database ----------
@@ -28,16 +69,20 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT NOT NULL,
     password_salt TEXT NOT NULL,
     display_name  TEXT,
-    mood          TEXT DEFAULT 'bouncy',
-    headline      TEXT DEFAULT 'woo :)',
+    mood          TEXT DEFAULT 'listening',
+    headline      TEXT DEFAULT '',
     about_me      TEXT DEFAULT '',
     fav_bands     TEXT DEFAULT '',
-    location      TEXT DEFAULT 'somewhere on the internet',
+    location      TEXT DEFAULT '',
     age           INTEGER,
-    avatar_emoji  TEXT DEFAULT '★',
-    theme         TEXT DEFAULT 'pink',
+    avatar_emoji  TEXT DEFAULT '◉',
+    theme         TEXT DEFAULT 'mag',
     created_at    TEXT NOT NULL,
-    last_login    TEXT
+    last_login    TEXT,
+    spotify_id            TEXT,
+    spotify_access_token  TEXT,
+    spotify_refresh_token TEXT,
+    spotify_token_expires INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS songs (
@@ -49,7 +94,11 @@ CREATE TABLE IF NOT EXISTS songs (
     genre       TEXT,
     link        TEXT,
     submitted_by INTEGER NOT NULL REFERENCES users(id),
-    created_at  TEXT NOT NULL
+    created_at  TEXT NOT NULL,
+    spotify_id          TEXT,
+    spotify_url         TEXT,
+    spotify_preview_url TEXT,
+    spotify_image       TEXT
 );
 
 CREATE TABLE IF NOT EXISTS ratings (
@@ -99,6 +148,28 @@ def init_db():
     con = sqlite3.connect(DB_PATH)
     con.executescript(SCHEMA)
     con.commit()
+    # additive migrations for existing databases
+    def existing(table):
+        return [r[1] for r in con.execute(f"PRAGMA table_info({table})").fetchall()]
+    user_cols = existing("users")
+    for col, ddl in [
+        ("spotify_id",            "TEXT"),
+        ("spotify_access_token",  "TEXT"),
+        ("spotify_refresh_token", "TEXT"),
+        ("spotify_token_expires", "INTEGER"),
+    ]:
+        if col not in user_cols:
+            con.execute(f"ALTER TABLE users ADD COLUMN {col} {ddl}")
+    song_cols = existing("songs")
+    for col, ddl in [
+        ("spotify_id",          "TEXT"),
+        ("spotify_url",         "TEXT"),
+        ("spotify_preview_url", "TEXT"),
+        ("spotify_image",       "TEXT"),
+    ]:
+        if col not in song_cols:
+            con.execute(f"ALTER TABLE songs ADD COLUMN {col} {ddl}")
+    con.commit()
     con.close()
 
 
@@ -114,15 +185,14 @@ def current_user():
     uid = session.get("user_id")
     if not uid:
         return None
-    row = get_db().execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
-    return row
+    return get_db().execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
 
 
 def login_required(fn):
     @wraps(fn)
     def wrapper(*a, **kw):
         if not session.get("user_id"):
-            flash("U gotta log in first ✿", "warn")
+            flash("Log in to continue.", "warn")
             return redirect(url_for("login", next=request.path))
         return fn(*a, **kw)
     return wrapper
@@ -133,7 +203,17 @@ def inject_globals():
     return {
         "current_user": current_user(),
         "now": datetime.utcnow(),
+        "spotify_enabled": spotify_configured(),
     }
+
+
+@app.template_filter("score10")
+def score10(value):
+    """Convert 0-5 average to a Pitchfork-style 0.0-10.0 score."""
+    try:
+        return "%.1f" % (float(value or 0) * 2.0)
+    except (TypeError, ValueError):
+        return "0.0"
 
 
 @app.template_filter("stars")
@@ -141,7 +221,7 @@ def stars_filter(value):
     try:
         n = int(round(float(value)))
     except (TypeError, ValueError):
-        return "no ratings yet"
+        return "—"
     n = max(0, min(5, n))
     return "★" * n + "☆" * (5 - n)
 
@@ -154,7 +234,25 @@ def datefmt(value):
         dt = datetime.fromisoformat(value)
     except (TypeError, ValueError):
         return value
-    return dt.strftime("%m/%d/%Y %I:%M %p").lstrip("0")
+    return dt.strftime("%m/%d/%y(%a)%H:%M")
+
+
+@app.template_filter("greentext")
+def greentext_filter(text):
+    """4chan-style greentext for lines starting with '>'."""
+    if not text:
+        return ""
+    from markupsafe import escape, Markup
+    out = []
+    for line in text.split("\n"):
+        e = str(escape(line))
+        if line.startswith(">") and not line.startswith(">>"):
+            out.append(f'<span class="gt">{e}</span>')
+        elif line.startswith(">>"):
+            out.append(f'<span class="quote">{e}</span>')
+        else:
+            out.append(e)
+    return Markup("<br>".join(out))
 
 
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_]{3,20}$")
@@ -179,12 +277,12 @@ def home():
     fresh_songs = db.execute("""
         SELECT s.*, u.username AS submitter
         FROM songs s JOIN users u ON u.id = s.submitted_by
-        ORDER BY s.id DESC LIMIT 6
+        ORDER BY s.id DESC LIMIT 8
     """).fetchall()
     bulletins = db.execute("""
         SELECT b.*, u.username FROM bulletins b
         JOIN users u ON u.id = b.user_id
-        ORDER BY b.id DESC LIMIT 8
+        ORDER BY b.id DESC LIMIT 10
     """).fetchall()
     online_users = db.execute("""
         SELECT id, username, avatar_emoji, mood FROM users
@@ -195,6 +293,9 @@ def home():
                (SELECT COUNT(*) FROM songs)   AS songs,
                (SELECT COUNT(*) FROM ratings) AS ratings
     """).fetchone()
+    bnm = None
+    if top_songs:
+        bnm = top_songs[0]
     return render_template(
         "home.html",
         top_songs=top_songs,
@@ -202,6 +303,7 @@ def home():
         bulletins=bulletins,
         online_users=online_users,
         counts=counts,
+        bnm=bnm,
     )
 
 
@@ -211,16 +313,16 @@ def signup():
         username = (request.form.get("username") or "").strip()
         password = request.form.get("password") or ""
         display_name = (request.form.get("display_name") or "").strip() or username
-        location = (request.form.get("location") or "").strip() or "somewhere on the internet"
+        location = (request.form.get("location") or "").strip()
         age_raw = request.form.get("age") or ""
         fav_bands = (request.form.get("fav_bands") or "").strip()
-        theme = request.form.get("theme") or "pink"
+        theme = request.form.get("theme") or "mag"
 
         if not USERNAME_RE.match(username):
             flash("Username must be 3-20 chars, letters/numbers/underscore only.", "warn")
             return render_template("signup.html")
         if len(password) < 4:
-            flash("Password too short, c'mon.", "warn")
+            flash("Password too short.", "warn")
             return render_template("signup.html")
         try:
             age = int(age_raw) if age_raw else None
@@ -243,10 +345,10 @@ def signup():
             )
             db.commit()
         except sqlite3.IntegrityError:
-            flash("That username is already taken :(", "warn")
+            flash("Username already taken.", "warn")
             return render_template("signup.html")
         session["user_id"] = cur.lastrowid
-        flash("Welcome to TuneSpace!! ♡", "ok")
+        flash("Account created.", "ok")
         return redirect(url_for("profile", username=username))
     return render_template("signup.html")
 
@@ -260,7 +362,7 @@ def login():
             "SELECT * FROM users WHERE username = ?", (username,)
         ).fetchone()
         if not row or hash_password(password, row["password_salt"]) != row["password_hash"]:
-            flash("Wrong username or password, sry.", "warn")
+            flash("Wrong username or password.", "warn")
             return render_template("login.html")
         session["user_id"] = row["id"]
         get_db().execute(
@@ -268,7 +370,7 @@ def login():
             (datetime.utcnow().isoformat(timespec="seconds"), row["id"]),
         )
         get_db().commit()
-        flash(f"hey {row['username']} :)", "ok")
+        flash(f"Welcome back, {row['username']}.", "ok")
         return redirect(request.args.get("next") or url_for("home"))
     return render_template("login.html")
 
@@ -276,7 +378,7 @@ def login():
 @app.route("/logout")
 def logout():
     session.clear()
-    flash("logged out. bye!! 〜(￣▽￣〜)", "ok")
+    flash("Logged out.", "ok")
     return redirect(url_for("home"))
 
 
@@ -345,8 +447,8 @@ def edit_profile():
             "about_me":     (request.form.get("about_me") or "").strip()[:4000],
             "fav_bands":    (request.form.get("fav_bands") or "").strip()[:1000],
             "location":     (request.form.get("location") or "").strip()[:80],
-            "avatar_emoji": (request.form.get("avatar_emoji") or "★")[:4],
-            "theme":         request.form.get("theme") or "pink",
+            "avatar_emoji": (request.form.get("avatar_emoji") or "◉")[:4],
+            "theme":         request.form.get("theme") or "mag",
         }
         try:
             fields["age"] = int(request.form.get("age") or 0) or None
@@ -358,7 +460,7 @@ def edit_profile():
             (*fields.values(), user["id"]),
         )
         db.commit()
-        flash("profile updated ✿", "ok")
+        flash("Profile updated.", "ok")
         return redirect(url_for("profile", username=user["username"]))
     return render_template("edit_profile.html", user=user)
 
@@ -411,16 +513,22 @@ def submit_song():
             year = int(request.form.get("year") or 0) or None
         except ValueError:
             year = None
+        sp_id     = (request.form.get("spotify_id") or "").strip()[:64] or None
+        sp_url    = (request.form.get("spotify_url") or "").strip()[:300] or None
+        sp_image  = (request.form.get("spotify_image") or "").strip()[:400] or None
+        sp_prev   = (request.form.get("spotify_preview_url") or "").strip()[:400] or None
         db = get_db()
         cur = db.execute(
-            """INSERT INTO songs (title, artist, album, year, genre, link, submitted_by, created_at)
-               VALUES (?,?,?,?,?,?,?,?)""",
+            """INSERT INTO songs (title, artist, album, year, genre, link, submitted_by, created_at,
+                                  spotify_id, spotify_url, spotify_image, spotify_preview_url)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
             (title[:120], artist[:120], album[:120], year, genre[:60],
              link[:300], session["user_id"],
-             datetime.utcnow().isoformat(timespec="seconds")),
+             datetime.utcnow().isoformat(timespec="seconds"),
+             sp_id, sp_url, sp_image, sp_prev),
         )
         db.commit()
-        flash("song added!! get it rated ★", "ok")
+        flash("Song added.", "ok")
         return redirect(url_for("song_detail", song_id=cur.lastrowid))
     return render_template("submit_song.html")
 
@@ -444,7 +552,7 @@ def song_detail(song_id):
         except ValueError:
             stars = 0
         if stars < 1 or stars > 5:
-            flash("Pick a rating between 1 and 5 ★", "warn")
+            flash("Pick a rating between 1 and 5.", "warn")
             return redirect(url_for("song_detail", song_id=song_id))
         review = (request.form.get("review") or "").strip()[:1500]
         db.execute("""
@@ -457,7 +565,7 @@ def song_detail(song_id):
         """, (song_id, session["user_id"], stars, review,
               datetime.utcnow().isoformat(timespec="seconds")))
         db.commit()
-        flash("rating saved 〜♪", "ok")
+        flash("Rating saved.", "ok")
         return redirect(url_for("song_detail", song_id=song_id))
 
     stats = db.execute("""
@@ -474,6 +582,7 @@ def song_detail(song_id):
         WHERE r.song_id = ? AND r.review != ''
         ORDER BY r.id DESC
     """, (song_id,)).fetchall()
+    featured = reviews[0] if reviews else None
     my_rating = None
     if session.get("user_id"):
         my_rating = db.execute(
@@ -482,7 +591,7 @@ def song_detail(song_id):
         ).fetchone()
     return render_template(
         "song.html", song=song, stats=stats, histogram=histogram,
-        max_h=max_h, reviews=reviews, my_rating=my_rating,
+        max_h=max_h, reviews=reviews, featured=featured, my_rating=my_rating,
     )
 
 
@@ -499,8 +608,203 @@ def post_bulletin():
              datetime.utcnow().isoformat(timespec="seconds")),
         )
         db.commit()
-        flash("bulletin posted ✿", "ok")
+        flash("Bulletin posted.", "ok")
     return redirect(url_for("home"))
+
+
+# ---------- Spotify routes ----------
+
+@app.route("/spotify/search")
+def spotify_search():
+    q = (request.args.get("q") or "").strip()
+    if not q:
+        return jsonify({"items": []})
+    if not spotify_configured():
+        return jsonify({
+            "error": "Spotify not configured. Set SPOTIFY_CLIENT_ID and "
+                     "SPOTIFY_CLIENT_SECRET environment variables."
+        }), 503
+    token = get_app_spotify_token()
+    if not token:
+        return jsonify({"error": "Couldn't get Spotify token."}), 502
+    try:
+        r = requests.get(
+            "https://api.spotify.com/v1/search",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"q": q, "type": "track", "limit": 8},
+            timeout=8,
+        )
+    except requests.RequestException as e:
+        return jsonify({"error": str(e)}), 502
+    if not r.ok:
+        return jsonify({"error": "Spotify error", "detail": r.text[:200]}), r.status_code
+    items = []
+    for t in r.json().get("tracks", {}).get("items", []):
+        album = t.get("album") or {}
+        images = album.get("images") or []
+        items.append({
+            "id":       t.get("id"),
+            "name":     t.get("name"),
+            "artists":  ", ".join(a["name"] for a in t.get("artists", [])),
+            "album":    album.get("name"),
+            "year":     (album.get("release_date") or "")[:4],
+            "image":    images[-1]["url"] if images else None,
+            "image_lg": images[0]["url"]  if images else None,
+            "url":      (t.get("external_urls") or {}).get("spotify"),
+            "preview":  t.get("preview_url"),
+        })
+    return jsonify({"items": items})
+
+
+@app.route("/spotify/connect")
+@login_required
+def spotify_connect():
+    if not spotify_configured():
+        flash("Spotify isn't configured on this server.", "warn")
+        return redirect(url_for("home"))
+    state = secrets.token_urlsafe(16)
+    session["spotify_oauth_state"] = state
+    params = urllib.parse.urlencode({
+        "client_id":     SPOTIFY_CLIENT_ID,
+        "response_type": "code",
+        "redirect_uri":  SPOTIFY_REDIRECT_URI,
+        "scope":         SPOTIFY_SCOPES,
+        "state":         state,
+        "show_dialog":   "false",
+    })
+    return redirect("https://accounts.spotify.com/authorize?" + params)
+
+
+@app.route("/spotify/callback")
+@login_required
+def spotify_callback():
+    if request.args.get("error"):
+        flash("Spotify auth canceled.", "warn")
+        return redirect(url_for("home"))
+    state = request.args.get("state", "")
+    saved = session.pop("spotify_oauth_state", None)
+    if not saved or saved != state:
+        flash("Spotify auth failed (state mismatch).", "warn")
+        return redirect(url_for("home"))
+    code = request.args.get("code")
+    if not code:
+        flash("Spotify auth failed (no code).", "warn")
+        return redirect(url_for("home"))
+    creds = base64.b64encode(f"{SPOTIFY_CLIENT_ID}:{SPOTIFY_CLIENT_SECRET}".encode()).decode()
+    try:
+        r = requests.post(
+            "https://accounts.spotify.com/api/token",
+            headers={"Authorization": f"Basic {creds}"},
+            data={
+                "grant_type":   "authorization_code",
+                "code":          code,
+                "redirect_uri":  SPOTIFY_REDIRECT_URI,
+            },
+            timeout=8,
+        )
+    except requests.RequestException as e:
+        flash(f"Spotify token exchange failed: {e}", "warn")
+        return redirect(url_for("home"))
+    if not r.ok:
+        flash("Spotify token exchange failed.", "warn")
+        return redirect(url_for("home"))
+    d = r.json()
+    profile_resp = requests.get(
+        "https://api.spotify.com/v1/me",
+        headers={"Authorization": f"Bearer {d['access_token']}"},
+        timeout=8,
+    )
+    sp_profile = profile_resp.json() if profile_resp.ok else {}
+    db = get_db()
+    db.execute(
+        """UPDATE users SET spotify_id=?, spotify_access_token=?,
+           spotify_refresh_token=?, spotify_token_expires=? WHERE id=?""",
+        (sp_profile.get("id"), d.get("access_token"),
+         d.get("refresh_token"),
+         int(time.time() + d.get("expires_in", 3600)),
+         session["user_id"]),
+    )
+    db.commit()
+    flash("Spotify connected.", "ok")
+    me = current_user()
+    return redirect(url_for("profile", username=me["username"]))
+
+
+@app.route("/spotify/disconnect", methods=["POST"])
+@login_required
+def spotify_disconnect():
+    db = get_db()
+    db.execute(
+        """UPDATE users SET spotify_id=NULL, spotify_access_token=NULL,
+           spotify_refresh_token=NULL, spotify_token_expires=NULL WHERE id=?""",
+        (session["user_id"],),
+    )
+    db.commit()
+    flash("Spotify disconnected.", "ok")
+    me = current_user()
+    return redirect(url_for("profile", username=me["username"]))
+
+
+def refresh_user_spotify_token(user_id):
+    db = get_db()
+    row = db.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    if not row or not row["spotify_refresh_token"]:
+        return None
+    if row["spotify_token_expires"] and row["spotify_token_expires"] > time.time() + 30:
+        return row["spotify_access_token"]
+    if not spotify_configured():
+        return None
+    creds = base64.b64encode(f"{SPOTIFY_CLIENT_ID}:{SPOTIFY_CLIENT_SECRET}".encode()).decode()
+    try:
+        r = requests.post(
+            "https://accounts.spotify.com/api/token",
+            headers={"Authorization": f"Basic {creds}"},
+            data={"grant_type": "refresh_token",
+                  "refresh_token": row["spotify_refresh_token"]},
+            timeout=8,
+        )
+    except requests.RequestException:
+        return None
+    if not r.ok:
+        return None
+    d = r.json()
+    db.execute(
+        """UPDATE users SET spotify_access_token=?, spotify_token_expires=? WHERE id=?""",
+        (d["access_token"],
+         int(time.time() + d.get("expires_in", 3600)),
+         user_id),
+    )
+    db.commit()
+    return d["access_token"]
+
+
+@app.route("/me/spotify/top")
+@login_required
+def my_spotify_top():
+    token = refresh_user_spotify_token(session["user_id"])
+    if not token:
+        return jsonify({"items": [], "connected": False})
+    try:
+        r = requests.get(
+            "https://api.spotify.com/v1/me/top/tracks",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"limit": 10, "time_range": "short_term"},
+            timeout=8,
+        )
+    except requests.RequestException:
+        return jsonify({"items": [], "connected": True})
+    if not r.ok:
+        return jsonify({"items": [], "connected": True})
+    items = [
+        {
+            "name":    t.get("name"),
+            "artists": ", ".join(a["name"] for a in t.get("artists", [])),
+            "url":     (t.get("external_urls") or {}).get("spotify"),
+            "image":   ((t.get("album") or {}).get("images") or [{}])[-1].get("url"),
+        }
+        for t in r.json().get("items", [])
+    ]
+    return jsonify({"items": items, "connected": True})
 
 
 # ---------- seed ----------
@@ -513,14 +817,14 @@ def seed_demo():
         db.close()
         return
     users = [
-        ("tom",       "myspace", "Tom",        "Santa Monica, CA",  29, "★", "blue",   "woo :)",                  "the original.", "Beatles, Superdrag, Jackson 5, Weezer, Radiohead"),
-        ("brunette",  "password","brunette",   "Anywhere, USA",     25, "♥", "pink",   "People say that before you die your whole life flashes...","just lookin' for good tunes.","Tegan and Sara, Death Cab"),
-        ("joey4eva",  "password","joey ♥",     "Florida",           18, "✿", "pink",   "I ♥ JOEY",                "Florida sunshine state of mind.", "*NSYNC, Backstreet Boys, Britney"),
-        ("xkamalx",   "password","kamal",      "Brooklyn, NY",      22, "✦", "neon",   "catch up clean up touch it","u2 / gomez / sugar drunk.",     "U2, Gomez, Sugar Drunk, I love lamp"),
-        ("duztin",    "password","Dustyn",     "California",        24, "☆", "blue",   "Hello, Dustynn Cruise!",  "horny mood. typical.",         "Mr. Woodcock OST, Flow Johnson"),
-        ("hide_codes","password","Layouts Co.","METAIRIE, Louisiana",18, "✪", "lime",   "Myspace Hide Codes is Myspace Hide Codes","need a fresh layout? click here!", "Avril, Ashlee, Hilary"),
+        ("tom",       "myspace",  "Tom",        "Santa Monica, CA",  29, "◉", "mag",     "the original.",                      "i'm here to help.",                                            "Beatles, Superdrag, Radiohead"),
+        ("brunette",  "password", "brunette",   "Anywhere, USA",     25, "✦", "mag",     "27 years old, still rating.",        "moody indie & sad-girl rock, mostly.",                         "Tegan and Sara, Mitski, Phoebe Bridgers"),
+        ("joey",      "password", "joey",       "Florida",           22, "✿", "mag",     "florida sunshine state of mind.",    "ex-boyband stan turned hyperpop convert.",                     "100 gecs, Charli XCX, Caroline Polachek"),
+        ("kamal",     "password", "kamal",      "Brooklyn, NY",      24, "♪", "noir",    "catch up. clean up. blog up.",       "writes too many words about three-minute songs.",              "U2, Gomez, Big Thief, Black Country, New Road"),
+        ("dustyn",    "password", "Dustyn",     "California",        24, "★", "noir",    "be careful what you put on shuffle.","yacht rock apologist.",                                        "Steely Dan, Toro y Moi, Mac DeMarco"),
+        ("layouts",   "password", "layouts",    "Metairie, LA",      28, "□", "lab",     "code in the morning, drone at night.","makes weird little instrumental loops.",                      "Tim Hecker, Grouper, Aphex Twin"),
+        ("anon",      "password", "anon",       "/mu/sic",           19, "?", "noir",    ">be me >rate songs >mfw",            "no waifu, no laifu. only ratings.",                            "Death Grips, Black Midi, JPEGMAFIA"),
     ]
-    salt0 = secrets.token_hex(16)
     now = datetime.utcnow().isoformat(timespec="seconds")
     user_ids = {}
     for u, pw, dn, loc, age, emoji, theme, hl, about, bands in users:
@@ -536,16 +840,18 @@ def seed_demo():
         user_ids[u] = c.lastrowid
 
     songs = [
-        ("Such Great Heights", "The Postal Service", "Give Up", 2003, "indie",     "https://example.com/sgh",   "brunette"),
-        ("Hey Ya!",            "OutKast",            "Speakerboxxx/The Love Below", 2003, "hip-hop", "https://example.com/heyya", "tom"),
-        ("Mr. Brightside",     "The Killers",        "Hot Fuss", 2003, "rock",      "https://example.com/mb",    "duztin"),
-        ("Since U Been Gone",  "Kelly Clarkson",     "Breakaway", 2004, "pop",      "https://example.com/sbg",   "joey4eva"),
-        ("Float On",           "Modest Mouse",       "Good News for People Who Love Bad News", 2004, "indie", "https://example.com/floaton","xkamalx"),
-        ("Crazy In Love",      "Beyoncé",            "Dangerously in Love", 2003, "r&b",  "https://example.com/cil","hide_codes"),
-        ("Karma Police",       "Radiohead",          "OK Computer", 1997, "alt-rock", "https://example.com/kp",  "tom"),
-        ("Maps",               "Yeah Yeah Yeahs",    "Fever to Tell", 2003, "indie",   "https://example.com/maps","brunette"),
-        ("Hollaback Girl",     "Gwen Stefani",       "Love. Angel. Music. Baby.", 2004, "pop", "https://example.com/hbg","joey4eva"),
-        ("Take Me Out",        "Franz Ferdinand",    "Franz Ferdinand", 2004, "rock",  "https://example.com/tmo","xkamalx"),
+        ("Such Great Heights",  "The Postal Service",   "Give Up",                                  2003, "indie",    None, "brunette"),
+        ("Hey Ya!",             "OutKast",              "Speakerboxxx/The Love Below",              2003, "hip-hop",  None, "tom"),
+        ("Mr. Brightside",      "The Killers",          "Hot Fuss",                                 2003, "rock",     None, "dustyn"),
+        ("Since U Been Gone",   "Kelly Clarkson",       "Breakaway",                                2004, "pop",      None, "joey"),
+        ("Float On",            "Modest Mouse",         "Good News for People Who Love Bad News",   2004, "indie",    None, "kamal"),
+        ("Crazy In Love",       "Beyoncé",              "Dangerously in Love",                      2003, "r&b",      None, "layouts"),
+        ("Karma Police",        "Radiohead",            "OK Computer",                              1997, "alt-rock", None, "tom"),
+        ("Maps",                "Yeah Yeah Yeahs",      "Fever to Tell",                            2003, "indie",    None, "brunette"),
+        ("Hollaback Girl",      "Gwen Stefani",         "Love. Angel. Music. Baby.",                2004, "pop",      None, "joey"),
+        ("Take Me Out",         "Franz Ferdinand",      "Franz Ferdinand",                          2004, "rock",     None, "kamal"),
+        ("Not Allowed",         "TV Girl",              "French Exit",                              2014, "indie",    None, "brunette"),
+        ("DUCKWORTH.",          "Kendrick Lamar",       "DAMN.",                                    2017, "hip-hop",  None, "anon"),
     ]
     song_ids = []
     for t, a, al, y, g, l, u in songs:
@@ -559,19 +865,21 @@ def seed_demo():
     import random
     rng = random.Random(7)
     reviews_pool = [
-        "absolute banger!! ⭐",
-        "this song lives in my head rent free",
-        "ehhh kinda mid tbh",
+        "absolute banger. headphones-on, eyes-closed material.",
+        ">be me\n>hear this song\n>cry\n>repeat",
+        "kind of mid honestly. structure's fine, vocals are doing too much.",
         "10/10 makes me wanna cry & dance at the same time",
-        "best song of the decade no contest",
-        "my friend put this on a burned cd 4 me <3",
-        "skipped after 30sec sry",
+        "best song of the decade no contest. fight me.",
+        "the production sits right between maximalist and tasteful. love it.",
+        ">tfw no chorus this good in my life",
+        "skipped after 30sec. sorry.",
         "iconic. period.",
+        "this would be a 10 if not for the bridge. that bridge is a 4.",
         "",
         "",
     ]
     for sid in song_ids:
-        raters = rng.sample(list(user_ids.values()), rng.randint(3, 5))
+        raters = rng.sample(list(user_ids.values()), rng.randint(3, 6))
         for uid in raters:
             stars = rng.choices([2,3,4,5], weights=[1,3,5,4])[0]
             db.execute(
@@ -581,12 +889,12 @@ def seed_demo():
             )
 
     bulletins = [
-        ("brunette",  "catch up, clean up, blog up, touch it!", "new pics up come comment me back ♥"),
-        ("xkamalx",   "UK How We Operate Pre-order",            "Gomez new album drops -- pre-order info inside!"),
-        ("joey4eva",  "If you open someone's bulletin that says HAHA Funny shit!!!",
-                      "...your mom will get a bf in 7 days. repost or else."),
-        ("hide_codes","New bloggy blog",                        "check out my new layout codes!! free for everyone."),
-        ("tom",       "MySpace... I mean TuneSpace tips",       "Edit your profile, add songs, rate em. Easy!"),
+        ("brunette", "new TV Girl rate just dropped",        "no notes. perfect 9.0."),
+        ("kamal",    "Pitchfork is wrong about the new BCNR","change my mind in the comments."),
+        ("joey",     "hyperpop is real music",                ">be me\n>defend Charli\n>get bullied\n>still right"),
+        ("layouts",  "playlist: studio bg loops",             "uploaded 12 ambient loops. take em or leave em."),
+        ("tom",      "TuneSpace v2 is live",                  "spotify search, new look, same ratings."),
+        ("anon",     "rate my taste",                         ">>1\nstop projecting"),
     ]
     for u, s, b in bulletins:
         db.execute(
@@ -595,12 +903,12 @@ def seed_demo():
         )
 
     comments = [
-        ("brunette",  "joey4eva", "omg ur page is so cute!!! ♥♥"),
-        ("brunette",  "tom",       "thx 4 the add :)"),
-        ("xkamalx",   "duztin",    "saw u rate Float On 5 stars... based"),
-        ("joey4eva",  "hide_codes","luv the layout girl!!"),
-        ("tom",       "brunette",  "thx for being a tunespace user!"),
-        ("duztin",    "xkamalx",   "we should start a band"),
+        ("brunette", "joey",    "your taste is so unhinged i love it"),
+        ("brunette", "tom",     "thanks for the add"),
+        ("kamal",    "dustyn",  "we are gonna disagree about steely dan forever"),
+        ("joey",     "layouts", "send me ur drone loops pls"),
+        ("tom",      "anon",    "less greentext, more reviews"),
+        ("anon",     "tom",     ">no\n>>1\nyou first"),
     ]
     for profile_u, author_u, body in comments:
         db.execute(
@@ -614,7 +922,6 @@ def seed_demo():
 
 @app.cli.command("init-db")
 def init_db_cmd():
-    """flask --app app init-db"""
     init_db()
     seed_demo()
     print("DB ready at", DB_PATH)

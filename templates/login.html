@@ -1,39 +1,37 @@
 {% extends "base.html" %}
-{% block title %}Log In -- TuneSpace{% endblock %}
+{% block title %}Log In — TuneSpace{% endblock %}
 {% block content %}
 
-<div class="cols">
-<div class="col">
+<div class="cols two">
 
-<div class="panel pink">
+<div>
+<div class="panel">
 <h2>Log In</h2>
 <div class="body">
     <form method="post">
-        <div class="row"><label>Username</label><input type="text" name="username" required></div>
-        <div class="row"><label>Password</label><input type="password" name="password" required></div>
-        <button type="submit" class="btn blue">log in →</button>
+        <div class="row"><label>Username</label><input type="text" name="username" required autocomplete="username"></div>
+        <div class="row"><label>Password</label><input type="password" name="password" required autocomplete="current-password"></div>
+        <button type="submit">Log In</button>
     </form>
-    <p style="margin-top:10px;">no account? <a href="{{ url_for('signup') }}">sign up here</a> ✿</p>
+    <hr class="divider">
+    <p style="font-family: var(--mono); font-size: 12px;">No account? <a href="{{ url_for('signup') }}">Sign up here.</a></p>
+</div>
 </div>
 </div>
 
+<div>
+<div class="panel">
+<h2>Demo Accounts</h2>
+<div class="body" style="font-family: var(--mono); font-size: 12px;">
+    <p>Password = <code>password</code> for all, except <code>tom</code>:<code>myspace</code></p>
+    <ul style="padding-left: 18px;">
+        <li>tom</li><li>brunette</li><li>joey</li>
+        <li>kamal</li><li>dustyn</li><li>layouts</li><li>anon</li>
+    </ul>
 </div>
-<div class="col">
-    <div class="panel cyan">
-        <h2>Try a demo account</h2>
-        <div class="body">
-            <p>seeded accounts (password = <code>password</code>, except tom = <code>myspace</code>):</p>
-            <ul>
-                <li>tom (admin-ish vibe)</li>
-                <li>brunette</li>
-                <li>joey4eva</li>
-                <li>xkamalx</li>
-                <li>duztin</li>
-                <li>hide_codes</li>
-            </ul>
-        </div>
-    </div>
 </div>
+</div>
+
 </div>
 
 {% endblock %}

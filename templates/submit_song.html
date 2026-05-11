@@ -1,37 +1,68 @@
 {% extends "base.html" %}
-{% block title %}Add a Song -- TuneSpace{% endblock %}
+{% block title %}Submit Track — TuneSpace{% endblock %}
 {% block content %}
 
-<div class="cols">
-<div class="col">
-<div class="panel pink">
-<h2>+ Add a Song</h2>
-<div class="body">
-<form method="post">
-    <div class="row"><label>Title *</label><input type="text" name="title" required></div>
-    <div class="row"><label>Artist *</label><input type="text" name="artist" required></div>
-    <div class="row"><label>Album</label><input type="text" name="album"></div>
-    <div class="row"><label>Year</label><input type="number" name="year" min="1900" max="2100"></div>
-    <div class="row"><label>Genre</label><input type="text" name="genre" placeholder="indie / pop / hip-hop ..."></div>
-    <div class="row"><label>Listen URL</label><input type="url" name="link" placeholder="https://..."></div>
-    <button type="submit" class="btn pink">Add Song ★</button>
-</form>
+<div class="cols two">
+
+<div>
+    <div class="panel">
+    <h2>Search Spotify</h2>
+    <div class="body">
+        {% if spotify_enabled %}
+        <div class="sp-widget" data-target-form="#song-form" data-mode="fill">
+            <div class="sp-search">
+                <input type="text" class="sp-q" placeholder="search for a track on Spotify…" autofocus>
+                <button class="sp-go">Search</button>
+            </div>
+            <div class="sp-results"></div>
+            <div class="sp-picked" style="display:none; margin-top:10px; padding:10px; background:var(--bg); border:1px solid var(--line); gap:10px; align-items:center;">
+                <img src="" alt="" style="width:48px; height:48px; object-fit:cover;">
+                <div class="t" style="font-weight:600;"></div>
+            </div>
+            <div style="margin-top:8px; font-family: var(--mono); font-size: 11px; color: var(--muted);">
+                Click a result to autofill the form below. You can still edit fields manually.
+            </div>
+        </div>
+        {% else %}
+        <div class="sp-disabled">
+            Spotify search is off. Admin: set <code>SPOTIFY_CLIENT_ID</code> and <code>SPOTIFY_CLIENT_SECRET</code>.
+        </div>
+        {% endif %}
+    </div>
+    </div>
+
+    <div class="panel">
+    <h2>Submit Track</h2>
+    <div class="body">
+    <form method="post" id="song-form">
+        <div class="row"><label>Title *</label><input type="text" name="title" required></div>
+        <div class="row"><label>Artist *</label><input type="text" name="artist" required></div>
+        <div class="row"><label>Album</label><input type="text" name="album"></div>
+        <div class="row"><label>Year</label><input type="number" name="year" min="1900" max="2100"></div>
+        <div class="row"><label>Genre</label><input type="text" name="genre" placeholder="indie / pop / hip-hop ..."></div>
+        <div class="row"><label>Listen URL</label><input type="url" name="link" placeholder="https://..."></div>
+        <input type="hidden" name="spotify_id">
+        <input type="hidden" name="spotify_url">
+        <input type="hidden" name="spotify_image">
+        <input type="hidden" name="spotify_preview_url">
+        <button type="submit">Add Track</button>
+    </form>
+    </div>
+    </div>
 </div>
+
+<div>
+    <div class="panel">
+        <h2>House Rules</h2>
+        <div class="body editorial" style="font-size:15px;">
+            <p>One submission per song. Use the Spotify picker when in doubt — it'll pin the exact track and album art.</p>
+            <p style="font-family: var(--mono); font-size: 12px; color: var(--muted);">
+                Reviews can be edited. Star ratings get averaged. Cool it on the duplicates.
+            </p>
+        </div>
+    </div>
 </div>
-</div>
-<div class="col">
-<div class="panel cyan">
-<h2>Rules of the road</h2>
-<div class="body">
-    <ul>
-        <li>be honest with ur stars</li>
-        <li>no duplicates plz</li>
-        <li>reviews are forever (well... until u edit them)</li>
-        <li>tipsy late-night ratings still count</li>
-    </ul>
-</div>
-</div>
-</div>
+
 </div>
 
 {% endblock %}

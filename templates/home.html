@@ -1,142 +1,150 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="glitter" style="margin-bottom:10px;">
-    <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; align-items:center;">
-        <div>
-            <div style="font-family:'Bungee'; font-size:22px; color:#003399; text-shadow:2px 2px 0 #ff66cc;">
-                Welcome to TuneSpace ♪
-            </div>
-            <div class="headline">sign up, rate the songs you love (or hate), make a profile, leave a comment.</div>
+{% if bnm %}
+<div class="feature">
+    <div>
+        <div class="bnm">Best New Track</div>
+        <div class="kicker">Top of the chart · submitted by <a href="{{ url_for('profile', username=bnm['submitter']) }}">@{{ bnm['submitter'] }}</a></div>
+        <div class="song-title">
+            <a href="{{ url_for('song_detail', song_id=bnm['id']) }}" style="text-decoration:none;">{{ bnm['title'] }}</a>
         </div>
-        <div>
-            <span class="under-construction">PAGE UNDER CONSTRUCTION</span>
-            <div style="margin-top:6px;">
-                {% if not current_user %}
-                    <a class="btn pink" href="{{ url_for('signup') }}">★ Sign Up Free ★</a>
-                    <a class="btn blue" href="{{ url_for('login') }}">Log In</a>
-                {% else %}
-                    <a class="btn pink" href="{{ url_for('submit_song') }}">+ Add a Song</a>
-                {% endif %}
-            </div>
+        <div class="song-artist">{{ bnm['artist'] }}{% if bnm['year'] %} · {{ bnm['year'] }}{% endif %}{% if bnm['album'] %} · <i>{{ bnm['album'] }}</i>{% endif %}</div>
+        <div style="margin-top:14px; display:flex; align-items:flex-end; gap:14px;">
+            <div class="score">{{ bnm['avg_stars']|score10 }}<span class="max">/10</span></div>
+            <div class="song-meta">{{ bnm['rating_count'] }} rating{{ '' if bnm['rating_count']==1 else 's' }} · <span class="stars">{{ bnm['avg_stars']|stars }}</span></div>
         </div>
     </div>
+    <div class="cover">
+        {% if bnm['spotify_image'] %}<img src="{{ bnm['spotify_image'] }}" alt="">{% else %}cover unavailable{% endif %}
+    </div>
 </div>
+{% endif %}
 
 <div class="cols three">
 
-<div class="col">
+<div>
 
-    <div class="panel pink">
-        <h2>★ Site Stats ★</h2>
-        <div class="body">
-            <div><b>Members:</b> {{ counts['users'] }}</div>
-            <div><b>Songs:</b> {{ counts['songs'] }}</div>
-            <div><b>Ratings cast:</b> {{ counts['ratings'] }}</div>
-            <div style="margin-top:6px;"><span class="blink">●</span> live since u clicked here</div>
+    <div class="panel">
+        <h2>Site</h2>
+        <div class="body" style="font-family: var(--mono); font-size: 12px;">
+            <div>Members <b>{{ counts['users'] }}</b></div>
+            <div>Tracks <b>{{ counts['songs'] }}</b></div>
+            <div>Ratings <b>{{ counts['ratings'] }}</b></div>
         </div>
     </div>
 
-    <div class="panel cyan">
-        <h2>Online Now!</h2>
+    <div class="panel">
+        <h2>Recently Seen</h2>
         <div class="body">
-            <div class="friends">
+            <div class="users-grid">
                 {% for u in online_users %}
-                  <a href="{{ url_for('profile', username=u['username']) }}">
-                    <div class="face">{{ u['avatar_emoji'] }}</div>
-                    <div>{{ u['username'] }}</div>
-                  </a>
+                    <a href="{{ url_for('profile', username=u['username']) }}">
+                        <div class="face">{{ u['avatar_emoji'] }}</div>
+                        <div class="name">@{{ u['username'] }}</div>
+                    </a>
                 {% endfor %}
             </div>
         </div>
     </div>
 
     {% if current_user %}
-    <div class="panel peach">
-        <h2>Post a Bulletin</h2>
+    <div class="panel">
+        <h2>Post Bulletin</h2>
         <div class="body">
-        <form method="post" action="{{ url_for('post_bulletin') }}">
-            <div class="row"><label>Subject</label><input type="text" name="subject" required></div>
-            <div class="row"><label>Body</label><textarea name="body" required></textarea></div>
-            <button type="submit">Post Bulletin ✿</button>
-        </form>
+            <form method="post" action="{{ url_for('post_bulletin') }}">
+                <div class="row"><label>Subject</label><input type="text" name="subject" required></div>
+                <div class="row"><label>Body</label><textarea name="body" placeholder="thoughts. greentext welcome." required></textarea></div>
+                <button type="submit">Post</button>
+            </form>
         </div>
     </div>
     {% endif %}
 
 </div>
 
-<div class="col">
+<div>
 
-    <div class="panel pink">
-        <h2>♪ Top Rated Songs ♪</h2>
-        <div class="body">
+    <div class="panel flat">
+        <h2>The Chart</h2>
+        <div class="body" style="padding-left:0; padding-right:0;">
         <table class="songlist">
             <thead><tr>
-                <th>#</th><th>Title</th><th>Artist</th>
-                <th>Stars</th><th>Votes</th><th>By</th>
+                <th>#</th><th>Track</th><th>Score</th><th>Votes</th><th>Submitted</th>
             </tr></thead>
             <tbody>
             {% for s in top_songs %}
                 <tr>
-                    <td>{{ loop.index }}</td>
-                    <td><a href="{{ url_for('song_detail', song_id=s['id']) }}">{{ s['title'] }}</a></td>
-                    <td>{{ s['artist'] }}</td>
-                    <td><span class="stars">{{ s['avg_stars']|stars }}</span><br><small>{{ '%.1f'|format(s['avg_stars'] or 0) }}/5</small></td>
-                    <td>{{ s['rating_count'] }}</td>
-                    <td><a href="{{ url_for('profile', username=s['submitter']) }}">{{ s['submitter'] }}</a></td>
+                    <td><span class="num">{{ loop.index }}</span></td>
+                    <td>
+                        <div><a href="{{ url_for('song_detail', song_id=s['id']) }}" style="font-weight:600;">{{ s['title'] }}</a></div>
+                        <div style="color:var(--muted); font-size:12px;">{{ s['artist'] }}{% if s['year'] %} · {{ s['year'] }}{% endif %}</div>
+                    </td>
+                    <td><span class="score sm">{{ s['avg_stars']|score10 }}</span></td>
+                    <td style="font-family:var(--mono);">{{ s['rating_count'] }}</td>
+                    <td style="font-family:var(--mono); font-size:12px;"><a href="{{ url_for('profile', username=s['submitter']) }}">@{{ s['submitter'] }}</a></td>
                 </tr>
             {% else %}
-                <tr><td colspan="6">no songs yet, be the first to add one!</td></tr>
+                <tr><td colspan="5">no songs yet. <a href="{{ url_for('submit_song') }}">submit one →</a></td></tr>
             {% endfor %}
             </tbody>
         </table>
         </div>
     </div>
 
-    <div class="panel cyan">
-        <h2>Fresh Cuts ✂</h2>
-        <div class="body">
+    <div class="panel flat">
+        <h2>New Submissions</h2>
+        <div class="body" style="padding-left:0; padding-right:0;">
             {% for s in fresh_songs %}
-                <div class="bulletin">
-                    <span class="subj"><a href="{{ url_for('song_detail', song_id=s['id']) }}">{{ s['title'] }}</a></span>
-                    -- {{ s['artist'] }} {% if s['year'] %}({{ s['year'] }}){% endif %}
-                    <div class="by">added by <a href="{{ url_for('profile', username=s['submitter']) }}">{{ s['submitter'] }}</a>
-                        on {{ s['created_at']|datefmt }}</div>
+                <div style="padding:8px 0; border-bottom:1px dotted var(--line);">
+                    <div><a href="{{ url_for('song_detail', song_id=s['id']) }}" style="font-weight:600;">{{ s['title'] }}</a> — <span style="color:var(--muted);">{{ s['artist'] }}</span>{% if s['year'] %} <span class="kicker">· {{ s['year'] }}</span>{% endif %}</div>
+                    <div class="song-meta">added by <a href="{{ url_for('profile', username=s['submitter']) }}">@{{ s['submitter'] }}</a> · {{ s['created_at']|datefmt }}</div>
                 </div>
-            {% else %}
-                <div>nothing yet :(</div>
-            {% endfor %}
+            {% else %}<div>nothing yet.</div>{% endfor %}
         </div>
     </div>
 
 </div>
 
-<div class="col">
+<div>
 
-    <div class="panel lime">
-        <h2>My Bulletin Space</h2>
+    <div class="panel">
+        <h2>Spotify Search</h2>
         <div class="body">
-            {% for b in bulletins %}
-                <div class="bulletin">
-                    <div class="subj"><a href="{{ url_for('profile', username=b['username']) }}">{{ b['username'] }}</a>: {{ b['subject'] }}</div>
-                    <div>{{ b['body'] }}</div>
-                    <div class="by">{{ b['created_at']|datefmt }}</div>
+            {% if spotify_enabled %}
+            <div class="sp-widget" data-mode="link">
+                <div class="sp-search">
+                    <input type="text" class="sp-q" placeholder="search any track…">
+                    <button class="sp-go">Go</button>
                 </div>
+                <div class="sp-results"></div>
+                <div style="margin-top:8px; font-family: var(--mono); font-size: 11px; color: var(--muted);">
+                    Click a result to open on Spotify.<br>
+                    To <i>add</i> a track to TuneSpace, use the <a href="{{ url_for('submit_song') }}">Submit page</a>.
+                </div>
+            </div>
             {% else %}
-                <div>no bulletins yet... type something!</div>
-            {% endfor %}
+            <div class="sp-disabled">
+                Spotify search is off. Admin: set <code>SPOTIFY_CLIENT_ID</code> and <code>SPOTIFY_CLIENT_SECRET</code>.
+            </div>
+            {% endif %}
         </div>
     </div>
 
-    <div class="panel peach">
-        <h2>About TuneSpace</h2>
+    <div class="panel">
+        <h2>/board/ — Bulletins</h2>
         <div class="body">
-            <p>TuneSpace is where you sign up, build a profile, and rate music with the rest of the internet.
-            Drop a song, give it some stars, leave a hot take in the comments.</p>
-            <p style="text-align:center;">
-                <span style="font-family:'Bungee'; color:#ff3399;">YOUR IN MY WORLD NOW</span>
-            </p>
+            {% for b in bulletins %}
+                <div class="post">
+                    <div class="meta">
+                        <span class="who">@{{ b['username'] }}</span>
+                        <span>{{ b['created_at']|datefmt }}</span>
+                        <span class="no">No.{{ '%07d'|format(b['id'] * 1337) }}</span>
+                    </div>
+                    <div class="body"><span class="subj">{{ b['subject'] }}</span></div>
+                    <div class="body">{{ b['body']|greentext }}</div>
+                </div>
+            {% else %}<div>no posts.</div>{% endfor %}
         </div>
     </div>
 

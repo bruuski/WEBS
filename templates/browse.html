@@ -1,45 +1,46 @@
 {% extends "base.html" %}
-{% block title %}Browse Songs -- TuneSpace{% endblock %}
+{% block title %}Charts — TuneSpace{% endblock %}
 {% block content %}
 
-<div class="panel pink">
-<h2>Browse the Charts ♪</h2>
-<div class="body">
-<form method="get" style="margin-bottom:10px; display:flex; gap:6px; flex-wrap:wrap;">
-    <input type="text" name="q" value="{{ q }}" placeholder="search title / artist / album / genre" style="flex:1; min-width:200px;">
+<div class="panel flat">
+<h2>Charts</h2>
+<div class="body" style="padding-left:0; padding-right:0;">
+<form method="get" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+    <input type="text" name="q" value="{{ q }}" placeholder="search title / artist / album / genre" style="flex:1; min-width:220px;">
     <select name="sort">
         <option value="top"   {% if sort=='top' %}selected{% endif %}>Top Rated</option>
         <option value="hot"   {% if sort=='hot' %}selected{% endif %}>Most Voted</option>
         <option value="new"   {% if sort=='new' %}selected{% endif %}>Newest</option>
-        <option value="title" {% if sort=='title' %}selected{% endif %}>A-Z</option>
+        <option value="title" {% if sort=='title' %}selected{% endif %}>A–Z</option>
     </select>
     <button type="submit">Search</button>
-    <a class="btn pink" href="{{ url_for('submit_song') }}">+ Add Song</a>
+    <a class="btn ghost" href="{{ url_for('submit_song') }}">+ Submit</a>
 </form>
 
 <table class="songlist">
     <thead><tr>
-        <th>Title</th><th>Artist</th><th>Album</th><th>Year</th><th>Genre</th>
-        <th>Stars</th><th>Votes</th><th>Added by</th>
+        <th>Track</th><th>Album</th><th>Year</th><th>Genre</th>
+        <th>Score</th><th>Votes</th><th>Submitted</th>
     </tr></thead>
     <tbody>
     {% for s in songs %}
         <tr>
-            <td><a href="{{ url_for('song_detail', song_id=s['id']) }}">{{ s['title'] }}</a></td>
-            <td>{{ s['artist'] }}</td>
-            <td>{{ s['album'] or '' }}</td>
-            <td>{{ s['year'] or '' }}</td>
-            <td>{{ s['genre'] or '' }}</td>
-            <td><span class="stars">{{ s['avg_stars']|stars }}</span><br><small>{{ '%.1f'|format(s['avg_stars'] or 0) }}</small></td>
-            <td>{{ s['rating_count'] }}</td>
-            <td><a href="{{ url_for('profile', username=s['submitter']) }}">{{ s['submitter'] }}</a></td>
+            <td>
+                <div><a href="{{ url_for('song_detail', song_id=s['id']) }}" style="font-weight:600;">{{ s['title'] }}</a></div>
+                <div style="color:var(--muted); font-size:12px;">{{ s['artist'] }}</div>
+            </td>
+            <td><i>{{ s['album'] or '' }}</i></td>
+            <td style="font-family:var(--mono); font-size:12px;">{{ s['year'] or '' }}</td>
+            <td style="font-family:var(--mono); font-size:12px;">{{ s['genre'] or '' }}</td>
+            <td><span class="score sm">{{ s['avg_stars']|score10 }}</span></td>
+            <td style="font-family:var(--mono);">{{ s['rating_count'] }}</td>
+            <td style="font-family:var(--mono); font-size:12px;"><a href="{{ url_for('profile', username=s['submitter']) }}">@{{ s['submitter'] }}</a></td>
         </tr>
     {% else %}
-        <tr><td colspan="8">no songs match. <a href="{{ url_for('submit_song') }}">add one?</a></td></tr>
+        <tr><td colspan="7">no songs match. <a href="{{ url_for('submit_song') }}">add one →</a></td></tr>
     {% endfor %}
     </tbody>
 </table>
-
 </div>
 </div>
 

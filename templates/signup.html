@@ -1,51 +1,43 @@
 {% extends "base.html" %}
-{% block title %}Sign Up -- TuneSpace{% endblock %}
+{% block title %}Sign Up — TuneSpace{% endblock %}
 {% block content %}
 
-<div class="cols">
-<div class="col">
+<div class="cols two">
 
-<div class="panel pink">
-<h2>Sign Up Free !!</h2>
-<div class="body glitter">
-    <p><b>Join TuneSpace today!!</b> ★ rate songs ★ make a profile ★ leave glittery comments ★</p>
+<div>
+<div class="panel">
+<h2>Create Account</h2>
+<div class="body">
     <form method="post">
-        <div class="row"><label>Username *</label><input type="text" name="username" required></div>
-        <div class="row"><label>Password *</label><input type="password" name="password" required></div>
-        <div class="row"><label>Display name</label><input type="text" name="display_name"></div>
-        <div class="row"><label>Location</label><input type="text" name="location" placeholder="Santa Monica, CA"></div>
+        <div class="row"><label>Username *</label><input type="text" name="username" required autocomplete="username"></div>
+        <div class="row"><label>Password *</label><input type="password" name="password" required autocomplete="new-password"></div>
+        <div class="row"><label>Display Name</label><input type="text" name="display_name"></div>
+        <div class="row"><label>Location</label><input type="text" name="location" placeholder="city, country"></div>
         <div class="row"><label>Age</label><input type="number" name="age" min="13" max="120"></div>
-        <div class="row"><label>Favorite bands (comma sep)</label><input type="text" name="fav_bands" placeholder="Beatles, Weezer, Radiohead"></div>
+        <div class="row"><label>Favorite Artists</label><input type="text" name="fav_bands" placeholder="comma-separated"></div>
         <div class="row"><label>Theme</label>
             <select name="theme">
-                <option value="pink">Pink ♥</option>
-                <option value="blue">Classic Blue</option>
-                <option value="lime">Lime Stripes</option>
-                <option value="neon">Neon Night</option>
+                <option value="mag">Magazine (light)</option>
+                <option value="noir">Noir (dark)</option>
+                <option value="lab">Lab (green accent)</option>
             </select>
         </div>
-        <button type="submit" class="btn pink">★ Create my account ★</button>
+        <button type="submit">Create Account</button>
     </form>
 </div>
 </div>
+</div>
 
+<div>
+<div class="panel">
+<h2>Why TuneSpace</h2>
+<div class="body editorial" style="font-size: 15px;">
+    <p>Rate any song from 1 to 5 stars. Write a review when you have something to say. Search Spotify, link your account, see what you actually listen to.</p>
+    <p style="font-family: var(--mono); font-size: 12px; color: var(--muted);">No ads. No algorithm. Just text and numbers.</p>
 </div>
-<div class="col">
-    <div class="panel cyan">
-        <h2>Why TuneSpace?</h2>
-        <div class="body">
-            <ul>
-                <li>♪ rate any song 1-5 stars</li>
-                <li>✎ leave glitter-pen reviews</li>
-                <li>✿ personalize ur profile</li>
-                <li>★ comment on friends</li>
-                <li>📣 post bulletins to the front page</li>
-            </ul>
-            <p class="headline">"i don't trust people who don't rate music"</p>
-            <p style="text-align:center;"><span class="under-construction">100% FREE</span></p>
-        </div>
-    </div>
 </div>
+</div>
+
 </div>
 
 {% endblock %}
