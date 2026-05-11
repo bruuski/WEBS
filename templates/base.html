@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{% block title %}TuneSpace -- a place for music{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<div class="topbar">
+    <span><a href="{{ url_for('home') }}">TuneSpace.com</a> | <a href="{{ url_for('home') }}">Home</a></span>
+    <span class="right">
+        {% if current_user %}
+            Hi, <a href="{{ url_for('profile', username=current_user['username']) }}">{{ current_user['username'] }}</a>!
+            | <a href="{{ url_for('edit_profile') }}">Edit Profile</a>
+            | <a href="{{ url_for('logout') }}">Log Out</a>
+        {% else %}
+            <a href="{{ url_for('login') }}">Help</a> | <a href="{{ url_for('signup') }}">Sign Up</a>
+        {% endif %}
+    </span>
+</div>
+
+<div class="bannerstrip">
+    ✦ Wish You Were Here! Put Your Music Taste In Action ✦ Rate. Review. Repeat. ✦
+</div>
+
+<div class="brand">
+    TuneSpace<span class="tag">"a place for music" -- est. forever ago</span>
+</div>
+
+<div class="navbar">
+    <a href="{{ url_for('home') }}">Home</a>
+    <a href="{{ url_for('browse') }}">Browse</a>
+    <a href="{{ url_for('browse', sort='new') }}">Fresh Cuts</a>
+    <a href="{{ url_for('submit_song') }}">+ Add Song</a>
+    {% if current_user %}
+        <a href="{{ url_for('profile', username=current_user['username']) }}">My Profile</a>
+    {% else %}
+        <a href="{{ url_for('signup') }}">Sign Up</a>
+        <a href="{{ url_for('login') }}">Log In</a>
+    {% endif %}
+</div>
+
+<div class="page theme-{{ (current_user['theme'] if current_user else 'pink') }}">
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+    <div class="flash {{ cat }}">{{ msg }}</div>
+  {% endfor %}
+{% endwith %}
+
+{% block content %}{% endblock %}
+</div>
+
+<div class="footer">
+    <div class="marquee">★ TuneSpace.com ☆ The #1 spot to rate the songs stuck in your head ★ {{ now.year }} ☆</div>
+    <p>&copy; {{ now.year }} TuneSpace, Inc. <span class="rainbow">All hits reserved.</span></p>
+    <p><a href="{{ url_for('home') }}">Home</a> | <a href="{{ url_for('browse') }}">Browse</a>
+       {% if not current_user %}| <a href="{{ url_for('signup') }}">Sign Up</a>{% endif %}</p>
+</div>
+
+</body>
+</html>

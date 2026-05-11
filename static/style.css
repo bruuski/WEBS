@@ -1,0 +1,333 @@
+/* TuneSpace -- like it's 2006 again */
+
+@import url('https://fonts.googleapis.com/css2?family=VT323&family=Bungee&family=Comic+Neue:wght@400;700&display=swap');
+
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+    font-family: "Trebuchet MS", Tahoma, Verdana, sans-serif;
+    font-size: 13px;
+    color: #000;
+    background: #2c2cc8;
+    background-image:
+        repeating-linear-gradient(45deg,
+            rgba(255,255,255,0.04) 0 12px,
+            transparent 12px 24px);
+}
+
+a { color: #003399; text-decoration: underline; }
+a:visited { color: #663399; }
+a:hover { color: #ff3399; background: #ffff66; }
+
+img { border: 0; }
+
+/* ---------- top banner ---------- */
+.topbar {
+    background: linear-gradient(#3b3bbf, #1c1c8c);
+    color: #fff;
+    padding: 6px 10px;
+    border-bottom: 2px solid #000;
+    font-size: 11px;
+}
+.topbar a { color: #fff; }
+.topbar a:hover { background: #ffff66; color: #1c1c8c; }
+.topbar .right { float: right; }
+
+.bannerstrip {
+    background: #ff66cc;
+    color: #fff;
+    padding: 6px 10px;
+    text-align: center;
+    font-family: "Bungee", "Impact", sans-serif;
+    letter-spacing: 1px;
+    border-bottom: 2px solid #000;
+    text-shadow: 1px 1px 0 #000;
+}
+
+.brand {
+    background: linear-gradient(#0033cc, #001a66);
+    color: #fff;
+    padding: 14px 16px;
+    font-family: "Bungee", Impact, sans-serif;
+    font-size: 28px;
+    letter-spacing: 2px;
+    border-bottom: 2px solid #000;
+    text-shadow: 2px 2px 0 #ff33aa, 4px 4px 0 #000;
+}
+.brand .tag {
+    font-family: "Comic Neue", "Comic Sans MS", cursive;
+    font-size: 12px;
+    color: #ffff99;
+    margin-left: 12px;
+    text-shadow: 1px 1px 0 #000;
+}
+
+.navbar {
+    background: linear-gradient(#5b5bd6, #2c2cc8);
+    border-bottom: 2px solid #000;
+    padding: 6px 10px;
+    text-align: center;
+    color: #fff;
+    font-weight: bold;
+}
+.navbar a {
+    color: #fff;
+    text-decoration: none;
+    padding: 2px 6px;
+    border-right: 1px solid #fff;
+}
+.navbar a:last-child { border-right: none; }
+.navbar a:hover { background: #ffff66; color: #001a66; }
+
+/* ---------- layout ---------- */
+.page {
+    max-width: 980px;
+    margin: 0 auto;
+    background: #fff;
+    border: 2px solid #000;
+    border-top: none;
+    padding: 10px;
+}
+
+.cols {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 10px;
+}
+.cols.three { grid-template-columns: 260px 1fr 220px; }
+
+.col { min-width: 0; }
+
+@media (max-width: 760px) {
+    .cols, .cols.three { grid-template-columns: 1fr; }
+}
+
+/* ---------- panel ---------- */
+.panel {
+    border: 1px solid #000;
+    margin-bottom: 10px;
+    background: #fff;
+}
+.panel h2 {
+    margin: 0;
+    padding: 4px 8px;
+    font-size: 12px;
+    background: linear-gradient(#7575e0, #4444b8);
+    color: #fff;
+    border-bottom: 1px solid #000;
+    font-family: Verdana, sans-serif;
+    letter-spacing: 1px;
+}
+.panel .body { padding: 8px; }
+
+/* themed panels */
+.panel.pink h2  { background: linear-gradient(#ff8fc1, #ff3399); color:#fff; }
+.panel.cyan h2  { background: linear-gradient(#7fe0ff, #00aacc); color:#000; }
+.panel.lime h2  { background: linear-gradient(#ccff66, #66cc33); color:#000; }
+.panel.peach h2 { background: linear-gradient(#ffd9a8, #ff9933); color:#000; }
+.panel.black h2 { background: #111; color: #ff66cc; }
+
+/* ---------- profile card ---------- */
+.profile-card .top {
+    background: #ffccee;
+    padding: 8px;
+    text-align: center;
+    border-bottom: 1px dashed #ff3399;
+}
+.avatar {
+    display: inline-block;
+    width: 96px; height: 96px;
+    line-height: 96px;
+    text-align: center;
+    font-size: 56px;
+    background: linear-gradient(135deg, #ffe6f0, #ffb3d9);
+    border: 3px ridge #ff66cc;
+}
+.avatar.lg { width: 140px; height: 140px; line-height: 140px; font-size: 80px; }
+.profile-card .meta {
+    text-align: left;
+    padding: 6px 8px;
+    line-height: 1.5;
+}
+.profile-card .display-name {
+    font-family: "Bungee", Impact, sans-serif;
+    font-size: 18px;
+    color: #ff3399;
+    text-shadow: 1px 1px 0 #000;
+    margin: 4px 0;
+}
+.headline {
+    font-family: "Comic Neue", "Comic Sans MS", cursive;
+    color: #663399;
+    font-style: italic;
+}
+
+/* ---------- forms ---------- */
+form .row { margin-bottom: 6px; }
+label { display: block; font-weight: bold; color: #003399; }
+input[type=text], input[type=password], input[type=number], input[type=url],
+input[type=email], select, textarea {
+    width: 100%;
+    padding: 4px;
+    border: 1px solid #888;
+    background: #ffffee;
+    font-family: inherit;
+    font-size: 13px;
+}
+textarea { min-height: 80px; resize: vertical; }
+button, input[type=submit], .btn {
+    display: inline-block;
+    background: linear-gradient(#ffe199, #ff9933);
+    border: 2px outset #ffcc66;
+    padding: 4px 12px;
+    font-weight: bold;
+    color: #000;
+    cursor: pointer;
+    font-family: inherit;
+    text-decoration: none;
+}
+button:hover, .btn:hover { background: linear-gradient(#fff, #ffcc66); }
+.btn.pink { background: linear-gradient(#ffc8e2, #ff66aa); border-color:#ff3399; }
+.btn.blue { background: linear-gradient(#aacaff, #3366cc); border-color:#003399; color:#fff; }
+
+/* ---------- song list ---------- */
+.songlist { width: 100%; border-collapse: collapse; }
+.songlist th, .songlist td {
+    border-bottom: 1px dotted #999;
+    padding: 4px 6px;
+    text-align: left;
+    vertical-align: top;
+}
+.songlist th {
+    background: #ffccee;
+    color: #003399;
+    border-bottom: 1px solid #000;
+}
+.songlist tr:nth-child(even) td { background: #fff7fb; }
+.songlist tr:hover td { background: #ffff99; }
+.stars { color: #ffaa00; font-size: 14px; letter-spacing: 1px; text-shadow: 1px 1px 0 #663300; }
+
+/* ---------- marquee + flair ---------- */
+.marquee {
+    background: #000;
+    color: #ff66cc;
+    padding: 4px 6px;
+    border: 1px solid #ff66cc;
+    font-family: "VT323", monospace;
+    font-size: 16px;
+    letter-spacing: 1px;
+}
+.glitter {
+    background:
+        radial-gradient(circle at 20% 30%, #ff66cc 1px, transparent 2px),
+        radial-gradient(circle at 70% 60%, #66ccff 1px, transparent 2px),
+        radial-gradient(circle at 40% 80%, #ffff66 1px, transparent 2px),
+        radial-gradient(circle at 85% 20%, #99ff99 1px, transparent 2px),
+        linear-gradient(#ffe6f5, #ffccee);
+    background-size: 30px 30px, 28px 28px, 24px 24px, 32px 32px, 100% 100%;
+    padding: 8px;
+}
+
+.flash {
+    border: 2px dashed #000;
+    padding: 6px 10px;
+    margin: 6px 0;
+    background: #ffffaa;
+    font-weight: bold;
+}
+.flash.warn { background: #ffcccc; color: #990000; }
+.flash.ok   { background: #ccffcc; color: #006600; }
+
+/* ---------- bulletins ---------- */
+.bulletin {
+    border-bottom: 1px dashed #aaa;
+    padding: 4px 0;
+}
+.bulletin .subj { font-weight: bold; color: #003399; }
+.bulletin .by { color: #888; font-size: 11px; }
+
+.comment {
+    border: 1px solid #ff99cc;
+    background: #fff0f7;
+    padding: 6px;
+    margin-bottom: 6px;
+}
+.comment .who {
+    background: #ff66aa; color: #fff; padding: 2px 6px;
+    font-weight: bold; display: inline-block;
+}
+.comment .when { color: #666; font-size: 11px; margin-left: 6px; }
+
+/* ---------- friends grid ---------- */
+.friends {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    text-align: center;
+    font-size: 11px;
+}
+.friends a { text-decoration: none; }
+.friends .face {
+    width: 100%; aspect-ratio: 1/1;
+    background: linear-gradient(135deg, #fff, #ffccee);
+    border: 2px solid #ff66aa;
+    line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px;
+}
+
+/* ---------- histogram ---------- */
+.histo .bar {
+    background: #ffccee;
+    border: 1px solid #ff66aa;
+    height: 14px;
+    margin: 2px 0;
+}
+.histo .bar > span {
+    display: block; height: 100%;
+    background: linear-gradient(#ffaa00, #ff6600);
+}
+
+/* ---------- footer ---------- */
+.footer {
+    text-align: center;
+    color: #ccccff;
+    padding: 12px;
+    font-size: 11px;
+}
+.footer a { color: #ffff99; }
+
+.blink { animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+.under-construction {
+    background: repeating-linear-gradient(45deg, #000 0 10px, #ffcc00 10px 20px);
+    color: #000;
+    padding: 4px 8px;
+    display: inline-block;
+    font-weight: bold;
+    border: 2px solid #000;
+}
+
+.rainbow {
+    background: linear-gradient(90deg,#ff0000,#ff9900,#ffff00,#33cc33,#3366ff,#9933cc);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-weight: bold;
+}
+
+/* ---------- theme variants applied to .page based on user theme ---------- */
+.theme-pink .panel h2  { background: linear-gradient(#ff8fc1, #ff3399); color:#fff; }
+.theme-blue .panel h2  { background: linear-gradient(#7575e0, #1c1c8c); color:#fff; }
+.theme-lime .panel h2  { background: linear-gradient(#ccff66, #339933); color:#000; }
+.theme-neon { background: #000; color: #ff66cc; }
+.theme-neon .panel { background: #110022; color: #ff66cc; }
+.theme-neon .panel h2 { background: #ff00aa; color: #000; }
+.theme-neon .songlist tr:nth-child(even) td { background: #1a0033; }
+.theme-neon .songlist tr:hover td { background: #330055; color: #ffff66; }
+.theme-neon a { color: #66ffff; }
+.theme-neon a:visited { color: #ff99cc; }
+.theme-neon .songlist th { background: #220044; color: #ffff66; }

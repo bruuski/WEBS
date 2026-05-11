@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Edit Profile -- TuneSpace{% endblock %}
+{% block content %}
+
+<div class="panel pink">
+<h2>✎ Edit My Profile</h2>
+<div class="body">
+<form method="post">
+    <div class="row"><label>Display Name</label><input type="text" name="display_name" value="{{ user['display_name'] or '' }}"></div>
+    <div class="row"><label>Headline (quote)</label><input type="text" name="headline" value="{{ user['headline'] }}"></div>
+    <div class="row"><label>Mood</label><input type="text" name="mood" value="{{ user['mood'] }}"></div>
+    <div class="row"><label>Avatar (one emoji)</label><input type="text" name="avatar_emoji" maxlength="4" value="{{ user['avatar_emoji'] }}"></div>
+    <div class="row"><label>Location</label><input type="text" name="location" value="{{ user['location'] }}"></div>
+    <div class="row"><label>Age</label><input type="number" name="age" value="{{ user['age'] or '' }}"></div>
+    <div class="row"><label>Favorite Bands</label><input type="text" name="fav_bands" value="{{ user['fav_bands'] }}"></div>
+    <div class="row"><label>About Me</label><textarea name="about_me">{{ user['about_me'] }}</textarea></div>
+    <div class="row"><label>Theme</label>
+        <select name="theme">
+            {% for t in ['pink','blue','lime','neon'] %}
+              <option value="{{ t }}" {% if user['theme']==t %}selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <button type="submit" class="btn pink">Save my profile ✿</button>
+    <a class="btn" href="{{ url_for('profile', username=user['username']) }}">Cancel</a>
+</form>
+</div>
+</div>
+
+{% endblock %}

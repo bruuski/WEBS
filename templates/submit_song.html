@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Add a Song -- TuneSpace{% endblock %}
+{% block content %}
+
+<div class="cols">
+<div class="col">
+<div class="panel pink">
+<h2>+ Add a Song</h2>
+<div class="body">
+<form method="post">
+    <div class="row"><label>Title *</label><input type="text" name="title" required></div>
+    <div class="row"><label>Artist *</label><input type="text" name="artist" required></div>
+    <div class="row"><label>Album</label><input type="text" name="album"></div>
+    <div class="row"><label>Year</label><input type="number" name="year" min="1900" max="2100"></div>
+    <div class="row"><label>Genre</label><input type="text" name="genre" placeholder="indie / pop / hip-hop ..."></div>
+    <div class="row"><label>Listen URL</label><input type="url" name="link" placeholder="https://..."></div>
+    <button type="submit" class="btn pink">Add Song ★</button>
+</form>
+</div>
+</div>
+</div>
+<div class="col">
+<div class="panel cyan">
+<h2>Rules of the road</h2>
+<div class="body">
+    <ul>
+        <li>be honest with ur stars</li>
+        <li>no duplicates plz</li>
+        <li>reviews are forever (well... until u edit them)</li>
+        <li>tipsy late-night ratings still count</li>
+    </ul>
+</div>
+</div>
+</div>
+</div>
+
+{% endblock %}

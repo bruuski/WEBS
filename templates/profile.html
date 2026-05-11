@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}{{ user['display_name'] or user['username'] }} -- TuneSpace{% endblock %}
+{% block content %}
+
+<div class="cols three">
+
+<div class="col">
+    <div class="panel pink profile-card">
+        <h2>{{ user['display_name'] or user['username'] }}</h2>
+        <div class="top">
+            <div class="avatar lg">{{ user['avatar_emoji'] }}</div>
+            <div class="display-name">{{ user['display_name'] or user['username'] }}</div>
+            <div class="headline">"{{ user['headline'] }}"</div>
+        </div>
+        <div class="meta">
+            <div><b>Mood:</b> {{ user['mood'] }} <span class="blink">☻</span></div>
+            <div><b>Age:</b> {{ user['age'] or '??' }}</div>
+            <div><b>Location:</b> {{ user['location'] }}</div>
+            <div><b>Last Login:</b> {{ user['last_login']|datefmt or '—' }}</div>
+            <div><b>Member Since:</b> {{ user['created_at']|datefmt }}</div>
+            <div><b>Avg Rating Given:</b>
+                {% if avg_given %}<span class="stars">{{ avg_given|stars }}</span> ({{ '%.1f'|format(avg_given) }}/5){% else %}n/a{% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="panel cyan">
+        <h2>Contacting {{ user['username'] }}</h2>
+        <div class="body">
+            <ul style="list-style:none; padding:0; margin:0;">
+                <li>✉ <a href="#comment">Send Message</a></li>
+                <li>★ <a href="#">Add to Friends</a></li>
+                <li>♪ <a href="#">Forward Their Page</a></li>
+                <li>✿ <a href="#">Block User</a></li>
+            </ul>
+            {% if current_user and current_user['id'] == user['id'] %}
+                <p style="margin-top:8px;"><a class="btn pink" href="{{ url_for('edit_profile') }}">✎ Edit My Profile</a></p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="panel lime">
+        <h2>{{ user['username'] }}'s Interests</h2>
+        <div class="body">
+            <table>
+                <tr><th align="left">General</th><td>Music, MySpace, comment trains, mixtapes</td></tr>
+                <tr><th align="left">Music</th><td>{{ user['fav_bands'] or '???' }}</td></tr>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="col">
+    <div class="panel pink">
+        <h2>About me:</h2>
+        <div class="body">
+            {% if user['about_me'] %}
+                {{ user['about_me']|replace('\n','<br>')|safe }}
+            {% else %}
+                <em>{{ user['username'] }} hasn't filled out an About Me yet.</em>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="panel peach">
+        <h2>♪ Songs {{ user['username'] }} added</h2>
+        <div class="body">
+            {% if submitted %}
+            <table class="songlist">
+                <thead><tr><th>Title</th><th>Artist</th><th>Stars</th><th>Votes</th></tr></thead>
+                <tbody>
+                {% for s in submitted %}
+                  <tr>
+                    <td><a href="{{ url_for('song_detail', song_id=s['id']) }}">{{ s['title'] }}</a></td>
+                    <td>{{ s['artist'] }}</td>
+                    <td><span class="stars">{{ s['avg_stars']|stars }}</span></td>
+                    <td>{{ s['rating_count'] }}</td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}<em>none yet</em>{% endif %}
+        </div>
+    </div>
+
+    <div class="panel cyan">
+        <h2>★ Recent Ratings</h2>
+        <div class="body">
+            {% if ratings %}
+            {% for r in ratings %}
+                <div class="bulletin">
+                    <span class="stars">{{ r['stars']|stars }}</span> →
+                    <a href="{{ url_for('song_detail', song_id=r['song_id']) }}"><b>{{ r['title'] }}</b></a> by {{ r['artist'] }}
+                    {% if r['review'] %}<div>"{{ r['review'] }}"</div>{% endif %}
+                    <div class="by">{{ r['created_at']|datefmt }}</div>
+                </div>
+            {% endfor %}
+            {% else %}<em>no ratings yet</em>{% endif %}
+        </div>
+    </div>
+
+    <div class="panel pink" id="comment">
+        <h2>Comments ({{ comments|length }})</h2>
+        <div class="body">
+            {% if current_user %}
+            <form method="post" style="margin-bottom:10px;">
+                <textarea name="body" placeholder="leave a comment ♥" required></textarea>
+                <button type="submit" class="btn pink">Post Comment</button>
+            </form>
+            {% else %}
+                <p><a href="{{ url_for('login') }}">Log in</a> to leave a comment ✿</p>
+            {% endif %}
+            {% for c in comments %}
+                <div class="comment">
+                    <span class="who">{{ c['avatar_emoji'] }} <a style="color:#fff" href="{{ url_for('profile', username=c['username']) }}">{{ c['username'] }}</a></span>
+                    <span class="when">{{ c['created_at']|datefmt }}</span>
+                    <div>{{ c['body'] }}</div>
+                </div>
+            {% else %}<em>no comments yet -- be the first!</em>{% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="col">
+    <div class="panel pink">
+        <h2>{{ user['username'] }}'s Top Friends</h2>
+        <div class="body">
+            <div class="friends">
+                {% for f in top_friends %}
+                    <a href="{{ url_for('profile', username=f['username']) }}">
+                        <div class="face">{{ f['avatar_emoji'] }}</div>
+                        <div>{{ f['username'] }}</div>
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="panel lime">
+        <h2>MySpace URL:</h2>
+        <div class="body" style="word-break:break-all;">
+            tunespace.com/u/{{ user['username'] }}
+        </div>
+    </div>
+
+    <div class="panel cyan">
+        <h2>{{ user['username'] }}'s Mood</h2>
+        <div class="body" style="text-align:center; font-size:18px;">
+            <div style="font-size:42px;">{{ user['avatar_emoji'] }}</div>
+            <div class="headline">feeling {{ user['mood'] }}</div>
+        </div>
+    </div>
+</div>
+
+</div>
+
+{% endblock %}
