@@ -45,6 +45,78 @@ SPOTIFY_TRENDING_PLAYLIST = os.environ.get(
 )
 
 
+def _spotify_lookup_track(title, artist):
+    """Search Spotify for one track and return basic metadata, or None."""
+    if not spotify_configured():
+        return None
+    token = get_app_spotify_token()
+    if not token:
+        return None
+    q = f'track:"{title}" artist:"{artist}"'
+    try:
+        r = requests.get(
+            "https://api.spotify.com/v1/search",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"q": q, "type": "track", "limit": 1},
+            timeout=8,
+        )
+    except requests.RequestException:
+        return None
+    if not r.ok:
+        return None
+    items = (r.json().get("tracks") or {}).get("items") or []
+    if not items:
+        return None
+    t = items[0]
+    album = t.get("album") or {}
+    images = album.get("images") or []
+    return {
+        "id":      t.get("id"),
+        "url":     (t.get("external_urls") or {}).get("spotify"),
+        "image":   images[0]["url"] if images else None,
+        "preview": t.get("preview_url"),
+    }
+
+
+def backfill_covers_from_spotify():
+    """Attach Spotify cover art to existing songs that don't have one."""
+    if not spotify_configured():
+        print("[pacer] Spotify not configured; cover art will be empty. "
+              "Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET to fix.")
+        return
+    if not get_app_spotify_token():
+        print("[pacer] Spotify token request failed; skipping cover backfill.")
+        return
+    con = sqlite3.connect(DB_PATH)
+    con.row_factory = sqlite3.Row
+    rows = con.execute(
+        "SELECT id, title, artist FROM songs "
+        "WHERE spotify_image IS NULL OR spotify_image = ''"
+    ).fetchall()
+    if not rows:
+        con.close()
+        return
+    print(f"[pacer] backfilling cover art for {len(rows)} song(s)…")
+    updated = 0
+    for row in rows:
+        meta = _spotify_lookup_track(row["title"], row["artist"])
+        if not meta or not meta.get("image"):
+            continue
+        con.execute(
+            """UPDATE songs SET
+                  spotify_id          = COALESCE(NULLIF(spotify_id,''),  ?),
+                  spotify_url         = COALESCE(NULLIF(spotify_url,''), ?),
+                  spotify_image       = ?,
+                  spotify_preview_url = COALESCE(NULLIF(spotify_preview_url,''), ?)
+               WHERE id = ?""",
+            (meta["id"], meta["url"], meta["image"], meta["preview"], row["id"]),
+        )
+        updated += 1
+    con.commit()
+    con.close()
+    print(f"[pacer] cover backfill done: {updated}/{len(rows)} songs updated")
+
+
 def fetch_spotify_trending(limit=12):
     """Pull a few trending tracks from Spotify, with a short in-process cache."""
     if _trending_cache["items"] and _trending_cache["expires_at"] > time.time():
@@ -1059,10 +1131,14 @@ def seed_demo():
     ]
     song_ids = []
     for t, a, al, y, g, l, u in songs:
+        meta = _spotify_lookup_track(t, a) or {}
         c = db.execute(
-            """INSERT INTO songs (title,artist,album,year,genre,link,submitted_by,created_at)
-               VALUES (?,?,?,?,?,?,?,?)""",
-            (t, a, al, y, g, l, user_ids[u], now),
+            """INSERT INTO songs
+               (title,artist,album,year,genre,link,submitted_by,created_at,
+                spotify_id,spotify_url,spotify_image,spotify_preview_url)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (t, a, al, y, g, l or meta.get("url"), user_ids[u], now,
+             meta.get("id"), meta.get("url"), meta.get("image"), meta.get("preview")),
         )
         song_ids.append(c.lastrowid)
 
@@ -1178,10 +1254,12 @@ def seed_demo():
 def init_db_cmd():
     init_db()
     seed_demo()
+    backfill_covers_from_spotify()
     print("DB ready at", DB_PATH)
 
 
 if __name__ == "__main__":
     init_db()
     seed_demo()
+    backfill_covers_from_spotify()
     app.run(host="127.0.0.1", port=5000, debug=True)
