@@ -139,22 +139,22 @@
 <div>
 
     <div class="panel">
-        <h2>Spotify Search</h2>
+        <h2>🔎 Music Search</h2>
         <div class="body">
             {% if spotify_enabled %}
-            <div class="sp-widget" data-mode="link">
+            <div class="sp-widget">
                 <div class="sp-search">
-                    <input type="text" class="sp-q" placeholder="search any track…">
-                    <button class="sp-go">Go</button>
+                    <input type="text" class="sp-q" placeholder="search tracks &amp; albums…">
+                    <button class="sp-go">Search</button>
                 </div>
                 <div class="sp-results"></div>
                 <div style="margin-top:8px; font: 11px var(--tahoma); color:#555;">
-                    Click a result to open it on Spotify.
+                    Click a result to open and rate it on Pacer.
                 </div>
             </div>
             {% else %}
             <div class="sp-disabled">
-                Spotify search is off. Admin: set <code>SPOTIFY_CLIENT_ID</code> and <code>SPOTIFY_CLIENT_SECRET</code>.
+                Music search isn't configured. Admin: set <code>SPOTIFY_CLIENT_ID</code> and <code>SPOTIFY_CLIENT_SECRET</code>.
             </div>
             {% endif %}
         </div>

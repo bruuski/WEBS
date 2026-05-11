@@ -277,6 +277,27 @@ CREATE TABLE IF NOT EXISTS comments (
     created_at  TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS albums (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    spotify_id    TEXT UNIQUE,
+    name          TEXT NOT NULL,
+    artist        TEXT NOT NULL,
+    year          INTEGER,
+    spotify_url   TEXT,
+    spotify_image TEXT,
+    created_at    TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS album_ratings (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    album_id  INTEGER NOT NULL REFERENCES albums(id),
+    user_id   INTEGER NOT NULL REFERENCES users(id),
+    stars     INTEGER NOT NULL CHECK (stars BETWEEN 1 AND 5),
+    review    TEXT DEFAULT '',
+    created_at TEXT NOT NULL,
+    UNIQUE(album_id, user_id)
+);
+
 CREATE TABLE IF NOT EXISTS threads (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id    INTEGER NOT NULL REFERENCES users(id),
@@ -737,6 +758,170 @@ def track_from_spotify(spotify_id):
     return redirect(url_for("song_detail", song_id=song_id))
 
 
+# ---------- albums ----------
+
+def _find_or_create_album_from_spotify(spotify_id):
+    """Look up an album by spotify_id; create one from Spotify metadata if missing."""
+    if not spotify_id:
+        return None
+    db = get_db()
+    row = db.execute("SELECT id FROM albums WHERE spotify_id = ?", (spotify_id,)).fetchone()
+    if row:
+        return row["id"]
+    token = get_app_spotify_token()
+    if not token:
+        return None
+    try:
+        r = requests.get(
+            f"https://api.spotify.com/v1/albums/{spotify_id}",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=8,
+        )
+    except requests.RequestException:
+        return None
+    if not r.ok:
+        return None
+    a = r.json()
+    images = a.get("images") or []
+    try:
+        cur = db.execute(
+            """INSERT INTO albums (spotify_id, name, artist, year, spotify_url, spotify_image, created_at)
+               VALUES (?,?,?,?,?,?,?)""",
+            (
+                a.get("id"),
+                (a.get("name") or "")[:200],
+                ", ".join(ar["name"] for ar in a.get("artists", []))[:200],
+                int((a.get("release_date") or "0000")[:4] or 0) or None,
+                (a.get("external_urls") or {}).get("spotify"),
+                images[0]["url"] if images else None,
+                datetime.utcnow().isoformat(timespec="seconds"),
+            ),
+        )
+        db.commit()
+        return cur.lastrowid
+    except sqlite3.IntegrityError:
+        # raced
+        row = db.execute("SELECT id FROM albums WHERE spotify_id = ?", (spotify_id,)).fetchone()
+        return row["id"] if row else None
+
+
+_album_tracks_cache = {}   # spotify_album_id -> (items, expires_at)
+
+
+def _fetch_album_tracks(spotify_album_id):
+    """Fetch the tracklist for an album from Spotify, with a short cache."""
+    if not spotify_album_id:
+        return []
+    cached = _album_tracks_cache.get(spotify_album_id)
+    if cached and cached[1] > time.time():
+        return cached[0]
+    if not spotify_configured():
+        return []
+    token = get_app_spotify_token()
+    if not token:
+        return []
+    try:
+        r = requests.get(
+            f"https://api.spotify.com/v1/albums/{spotify_album_id}/tracks",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"limit": 50},
+            timeout=8,
+        )
+    except requests.RequestException:
+        return []
+    if not r.ok:
+        return []
+    items = []
+    for t in r.json().get("items", []):
+        ms = t.get("duration_ms") or 0
+        items.append({
+            "id":           t.get("id"),
+            "name":         t.get("name"),
+            "track_number": t.get("track_number"),
+            "artists":      ", ".join(a["name"] for a in t.get("artists", [])),
+            "duration":     f"{ms // 60000}:{(ms // 1000) % 60:02d}" if ms else "",
+            "preview":      t.get("preview_url"),
+            "url":          (t.get("external_urls") or {}).get("spotify"),
+        })
+    _album_tracks_cache[spotify_album_id] = (items, time.time() + 600)
+    return items
+
+
+@app.route("/album/spotify/<spotify_id>")
+def album_from_spotify(spotify_id):
+    """Land on a local album page for a Spotify album, creating it if needed."""
+    album_id = _find_or_create_album_from_spotify(spotify_id)
+    if not album_id:
+        flash("Couldn't look up that album on Spotify.", "warn")
+        return redirect(url_for("home"))
+    return redirect(url_for("album_detail", album_id=album_id))
+
+
+@app.route("/albums/<int:album_id>", methods=["GET", "POST"])
+def album_detail(album_id):
+    db = get_db()
+    album = db.execute("SELECT * FROM albums WHERE id = ?", (album_id,)).fetchone()
+    if not album:
+        abort(404)
+
+    if request.method == "POST":
+        if not session.get("user_id"):
+            flash("Log in to rate albums.", "warn")
+            return redirect(url_for("login", next=request.path))
+        try:
+            stars = int(request.form.get("stars") or 0)
+        except ValueError:
+            stars = 0
+        if stars < 1 or stars > 5:
+            flash("Pick a rating between 1 and 5.", "warn")
+            return redirect(url_for("album_detail", album_id=album_id))
+        review = (request.form.get("review") or "").strip()[:1500]
+        db.execute("""
+            INSERT INTO album_ratings (album_id, user_id, stars, review, created_at)
+            VALUES (?,?,?,?,?)
+            ON CONFLICT(album_id, user_id) DO UPDATE SET
+              stars = excluded.stars,
+              review = excluded.review,
+              created_at = excluded.created_at
+        """, (album_id, session["user_id"], stars, review,
+              datetime.utcnow().isoformat(timespec="seconds")))
+        db.commit()
+        flash("Rating saved.", "ok")
+        return redirect(url_for("album_detail", album_id=album_id))
+
+    stats = db.execute("""
+        SELECT COALESCE(AVG(stars), 0) AS avg_stars, COUNT(*) AS n
+        FROM album_ratings WHERE album_id = ?
+    """, (album_id,)).fetchone()
+    histogram = {i: 0 for i in range(1, 6)}
+    for row in db.execute(
+        "SELECT stars, COUNT(*) c FROM album_ratings WHERE album_id=? GROUP BY stars",
+        (album_id,),
+    ):
+        histogram[row["stars"]] = row["c"]
+    max_h = max(histogram.values()) or 1
+    reviews = db.execute("""
+        SELECT r.*, u.username, u.avatar_emoji FROM album_ratings r
+        JOIN users u ON u.id = r.user_id
+        WHERE r.album_id = ? AND r.review != ''
+        ORDER BY r.id DESC
+    """, (album_id,)).fetchall()
+    featured = reviews[0] if reviews else None
+    my_rating = None
+    if session.get("user_id"):
+        my_rating = db.execute(
+            "SELECT * FROM album_ratings WHERE album_id=? AND user_id=?",
+            (album_id, session["user_id"]),
+        ).fetchone()
+    tracks = _fetch_album_tracks(album["spotify_id"]) if album["spotify_id"] else []
+    return render_template(
+        "album.html",
+        album=album, stats=stats, histogram=histogram, max_h=max_h,
+        reviews=reviews, featured=featured, my_rating=my_rating,
+        tracks=tracks,
+    )
+
+
 @app.route("/songs/<int:song_id>", methods=["GET", "POST"])
 def song_detail(song_id):
     db = get_db()
@@ -892,12 +1077,14 @@ def post_bulletin():
 
 @app.route("/spotify/search")
 def spotify_search():
-    q = (request.args.get("q") or "").strip()
+    """Music search across tracks and albums on Spotify."""
+    q     = (request.args.get("q") or "").strip()
+    types = (request.args.get("type") or "track,album").strip()
     if not q:
         return jsonify({"items": []})
     if not spotify_configured():
         return jsonify({
-            "error": "Spotify not configured. Set SPOTIFY_CLIENT_ID and "
+            "error": "Music search isn't configured. Set SPOTIFY_CLIENT_ID and "
                      "SPOTIFY_CLIENT_SECRET environment variables."
         }), 503
     token = get_app_spotify_token()
@@ -907,18 +1094,23 @@ def spotify_search():
         r = requests.get(
             "https://api.spotify.com/v1/search",
             headers={"Authorization": f"Bearer {token}"},
-            params={"q": q, "type": "track", "limit": 8},
+            params={"q": q, "type": types, "limit": 6},
             timeout=8,
         )
     except requests.RequestException as e:
         return jsonify({"error": str(e)}), 502
     if not r.ok:
-        return jsonify({"error": "Spotify error", "detail": r.text[:200]}), r.status_code
+        return jsonify({"error": "Music search error", "detail": r.text[:200]}), r.status_code
+
+    payload = r.json()
     items = []
-    for t in r.json().get("tracks", {}).get("items", []):
+
+    # tracks
+    for t in (payload.get("tracks") or {}).get("items", []) or []:
         album = t.get("album") or {}
         images = album.get("images") or []
         items.append({
+            "kind":     "track",
             "id":       t.get("id"),
             "name":     t.get("name"),
             "artists":  ", ".join(a["name"] for a in t.get("artists", [])),
@@ -929,6 +1121,23 @@ def spotify_search():
             "url":      (t.get("external_urls") or {}).get("spotify"),
             "preview":  t.get("preview_url"),
         })
+
+    # albums
+    for a in (payload.get("albums") or {}).get("items", []) or []:
+        images = a.get("images") or []
+        items.append({
+            "kind":     "album",
+            "id":       a.get("id"),
+            "name":     a.get("name"),
+            "artists":  ", ".join(ar["name"] for ar in a.get("artists", [])),
+            "album":    a.get("name"),
+            "year":     (a.get("release_date") or "")[:4],
+            "image":    images[-1]["url"] if images else None,
+            "image_lg": images[0]["url"]  if images else None,
+            "url":      (a.get("external_urls") or {}).get("spotify"),
+            "preview":  None,
+        })
+
     return jsonify({"items": items})
 
 

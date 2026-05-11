@@ -1,8 +1,9 @@
-// Spotify search widget.
-// <div class="sp-widget" data-target-form="#song-form">
-//   <div class="sp-search"><input ...><button>Search</button></div>
-//   <div class="sp-results"></div>
-// </div>
+// Music search widget (Spotify-powered, lands on Pacer pages).
+// Markup:
+//   <div class="sp-widget">
+//     <div class="sp-search"><input class="sp-q"><button class="sp-go">Search</button></div>
+//     <div class="sp-results"></div>
+//   </div>
 (function () {
     function el(html) {
         var t = document.createElement('template');
@@ -20,11 +21,9 @@
     }
 
     function init(widget) {
-        var input    = widget.querySelector('input[type=search], input[type=text], input.sp-q');
+        var input    = widget.querySelector('input.sp-q, input[type=search], input[type=text]');
         var results  = widget.querySelector('.sp-results');
-        var targetSel = widget.getAttribute('data-target-form');
-        var targetForm = targetSel ? document.querySelector(targetSel) : null;
-        var mode     = widget.getAttribute('data-mode') || (targetForm ? 'fill' : 'link');
+        if (!input || !results) return;
 
         function render(items, err) {
             results.innerHTML = '';
@@ -39,59 +38,36 @@
             items.forEach(function (it) {
                 var img = it.image
                     ? '<img src="' + it.image + '" alt="">'
-                    : '<div style="width:48px;height:48px;background:#222;color:#888;display:flex;align-items:center;justify-content:center;font-family:monospace;font-size:10px;">♪</div>';
+                    : '<div class="sp-ph" style="width:48px;height:48px;background:#222;color:#888;display:flex;align-items:center;justify-content:center;font-family:monospace;font-size:14px;">♪</div>';
+                var kindPill = it.kind === 'album'
+                    ? '<span class="sp-pill alb">Album</span>'
+                    : '<span class="sp-pill">Track</span>';
                 var btn = el(
-                    '<button type="button" class="sp-result">' +
+                    '<a class="sp-result" href="#">' +
                         img +
                         '<div>' +
                             '<div class="t"></div>' +
                             '<div class="a"></div>' +
                         '</div>' +
-                        '<span class="sp-pill">Pick</span>' +
-                    '</button>'
+                        kindPill +
+                    '</a>'
                 );
                 btn.querySelector('.t').textContent = it.name || '(untitled)';
-                btn.querySelector('.a').textContent = (it.artists || '') + (it.album ? ' — ' + it.album : '') + (it.year ? ' (' + it.year + ')' : '');
-                btn.addEventListener('click', function () { choose(it); });
+                var sub = (it.artists || '');
+                if (it.kind === 'track' && it.album) sub += ' — ' + it.album;
+                if (it.year) sub += ' (' + it.year + ')';
+                btn.querySelector('.a').textContent = sub;
+                var path = it.kind === 'album'
+                    ? '/album/spotify/' + encodeURIComponent(it.id)
+                    : '/track/spotify/' + encodeURIComponent(it.id);
+                btn.setAttribute('href', path);
                 results.appendChild(btn);
             });
         }
 
-        function choose(it) {
-            if (mode === 'link') {
-                if (it.url) window.open(it.url, '_blank', 'noopener');
-                return;
-            }
-            if (!targetForm) return;
-            function set(name, val) {
-                var f = targetForm.querySelector('[name="' + name + '"]');
-                if (f && val != null) f.value = val;
-            }
-            set('title',  it.name);
-            set('artist', it.artists);
-            set('album',  it.album);
-            set('year',   it.year || '');
-            set('link',   it.url);
-            set('spotify_id',          it.id);
-            set('spotify_url',         it.url);
-            set('spotify_image',       it.image_lg || it.image);
-            set('spotify_preview_url', it.preview);
-            // visual confirm
-            var preview = widget.querySelector('.sp-picked');
-            if (preview) {
-                preview.style.display = 'block';
-                var img = preview.querySelector('img');
-                if (img && it.image) img.src = it.image;
-                var t = preview.querySelector('.t');
-                if (t) t.textContent = it.name + ' — ' + it.artists;
-            }
-            results.innerHTML = '';
-            input.value = it.name + ' — ' + it.artists;
-        }
-
         async function search(q) {
             if (!q || q.length < 2) { results.innerHTML = ''; return; }
-            results.innerHTML = '<div class="sp-disabled">Searching Spotify…</div>';
+            results.innerHTML = '<div class="sp-disabled">Searching…</div>';
             try {
                 var r = await fetch('/spotify/search?q=' + encodeURIComponent(q));
                 var j = await r.json();

@@ -44,22 +44,22 @@
             <ellipse cx="34" cy="36" rx="2.2" ry="2.6" fill="#000"/>
             <ellipse cx="54" cy="36" rx="2.2" ry="2.6" fill="#000"/>
         </svg>
-        <span class="brand">Pacer</span>
+        <span class="brand">PACER</span>
         <span class="spark">✦</span>
     </a>
-    <div class="tag">★ Review your music ★</div>
+    <div class="tag">★ music at your own pace ★</div>
 </div>
 
 <nav class="nav">
-    <a href="{{ url_for('home') }}">🏠 Home</a>
-    <a href="{{ url_for('browse') }}">📊 Charts</a>
-    <a href="{{ url_for('browse', sort='new') }}">✨ New</a>
-    <a href="{{ url_for('browse', sort='hot') }}">🔥 Hot</a>
-    <a href="{{ url_for('blog_list') }}">📝 Blog</a>
+    <a href="{{ url_for('home') }}"               class="{% if request.path == '/' %}active{% endif %}"><span class="ico">🏠</span><span class="lbl">Home</span></a>
+    <a href="{{ url_for('browse') }}"             class="{% if request.endpoint == 'browse' and request.args.get('sort','top') == 'top' %}active{% endif %}"><span class="ico">📊</span><span class="lbl">Charts</span></a>
+    <a href="{{ url_for('browse', sort='new') }}" class="{% if request.endpoint == 'browse' and request.args.get('sort') == 'new' %}active{% endif %}"><span class="ico">✨</span><span class="lbl">New</span></a>
+    <a href="{{ url_for('browse', sort='hot') }}" class="{% if request.endpoint == 'browse' and request.args.get('sort') == 'hot' %}active{% endif %}"><span class="ico">🔥</span><span class="lbl">Hot</span></a>
+    <a href="{{ url_for('blog_list') }}"          class="{% if request.endpoint and request.endpoint.startswith('blog') %}active{% endif %}"><span class="ico">📝</span><span class="lbl">Blog</span></a>
     {% if current_user %}
-        <a href="{{ url_for('profile', username=current_user['username']) }}">👤 My Profile</a>
+        <a href="{{ url_for('profile', username=current_user['username']) }}" class="{% if request.endpoint == 'profile' %}active{% endif %}"><span class="ico">👤</span><span class="lbl">Profile</span></a>
     {% else %}
-        <a href="{{ url_for('signup') }}">📝 Sign Up</a>
+        <a href="{{ url_for('signup') }}" class="{% if request.endpoint == 'signup' %}active{% endif %}"><span class="ico">📝</span><span class="lbl">Sign Up</span></a>
     {% endif %}
 </nav>
 
@@ -75,7 +75,7 @@
 
 <!-- Start Menu popover -->
 <div class="start-menu" id="start-menu">
-    <div class="sidebar">Pacer</div>
+    <div class="sidebar">PACER</div>
     <div class="items">
         <a href="{{ url_for('home') }}">🏠 Home</a>
         <a href="{{ url_for('browse') }}">📊 Charts</a>
