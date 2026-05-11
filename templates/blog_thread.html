@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}{{ thread['subject'] }} — Blog — Pacer{% endblock %}
+{% block content %}
+
+<div class="panel">
+    <h2>Blog · Thread No.{{ '%07d'|format(thread['id'] * 1337) }}</h2>
+    <div class="body">
+        <div class="post op">
+            <div class="meta">
+                <span class="who">@{{ thread['username'] }}</span>
+                <span>{{ thread['created_at']|datefmt }}</span>
+                <span class="no">No.{{ '%07d'|format(thread['id'] * 1337) }}</span>
+            </div>
+            <div class="body">
+                <div style="font: bold 14px var(--tahoma); color: var(--title-1); margin-bottom: 6px;">{{ thread['subject'] }}</div>
+                {{ thread['body']|greentext }}
+            </div>
+        </div>
+
+        <div style="margin: 12px 0 4px; font: bold 11px var(--tahoma); color:#444;">
+            {{ replies|length }} repl{{ 'y' if replies|length == 1 else 'ies' }}
+        </div>
+
+        {% for r in replies %}
+            <div class="post">
+                <div class="meta">
+                    <span class="who">@{{ r['username'] }}</span>
+                    <span>{{ r['created_at']|datefmt }}</span>
+                    <span class="no">No.{{ '%07d'|format(r['id'] * 1337) }}</span>
+                </div>
+                <div class="body">{{ r['body']|greentext }}</div>
+            </div>
+        {% endfor %}
+
+        <hr class="divider">
+
+        {% if current_user %}
+        <form method="post">
+            <div class="row"><label>Reply</label><textarea name="body" maxlength="5000" required placeholder="reply. greentext with >. quote with >>."></textarea></div>
+            <button type="submit">Post Reply</button>
+            <a class="btn" href="{{ url_for('blog_list') }}">Back to Blog</a>
+        </form>
+        {% else %}
+        <p style="font: 12px var(--tahoma);"><a href="{{ url_for('login', next=request.path) }}">Log in</a> to reply.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}

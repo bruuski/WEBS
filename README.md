@@ -16,6 +16,7 @@ A music ratings + reviews site with a Spotify-powered trending feed. Y2K / Windo
 - Embedded Spotify player on any track that has a `spotify_id`
 - "Connect Spotify" on your own profile → shows your last-4-weeks top tracks
 - Win98 taskbar with a real Start menu and a live clock
+- **Blog** — a community thread board where logged-in users start their own threads (subject + body) and others reply; recent threads also show up in a column on the home page
 
 The dedicated "submit a track" page has been removed — tracks enter the local DB the first time someone clicks a Spotify trending pick.
 
@@ -72,4 +73,6 @@ templates/
   edit_profile.html
   browse.html
   song.html
+  blog_list.html
+  blog_thread.html
 ```

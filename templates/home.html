@@ -161,6 +161,24 @@
     </div>
 
     <div class="panel">
+        <h2>📝 Blog Threads</h2>
+        <div class="body">
+            {% for t in recent_threads %}
+                <div class="thread-mini">
+                    <div class="subj"><a href="{{ url_for('blog_thread', thread_id=t['id']) }}">{{ t['subject'] }}</a></div>
+                    <div class="by">@{{ t['username'] }} · <b>{{ t['reply_count'] }}</b> repl{{ 'y' if t['reply_count'] == 1 else 'ies' }} · {{ t['last_activity']|datefmt }}</div>
+                </div>
+            {% else %}
+                <em style="font: 12px var(--tahoma);">No threads yet. <a href="{{ url_for('blog_list') }}">Start one →</a></em>
+            {% endfor %}
+            <div style="margin-top:8px;">
+                <a class="btn" href="{{ url_for('blog_list') }}">All Threads →</a>
+                {% if current_user %}<a class="btn" href="{{ url_for('blog_list') }}#new">+ New Thread</a>{% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
         <h2>/board/ — Bulletins</h2>
         <div class="body">
             {% for b in bulletins %}

@@ -826,6 +826,48 @@ body.theme-cyber a { color: #b0d8ff; }
 body.theme-cyber a:visited { color: #d0a8ff; }
 body.theme-cyber a:hover { color: #ff80a0; }
 
+/* ---------- blog threads ---------- */
+.thread-row {
+    display: grid;
+    grid-template-columns: 56px 1fr 110px;
+    gap: 10px;
+    padding: 8px;
+    background: #fff;
+    box-shadow: var(--sunken);
+    margin-bottom: 8px;
+    align-items: center;
+}
+.thread-row .meat { min-width: 0; }
+.thread-row .subj {
+    font: bold 14px var(--tahoma);
+    color: var(--title-1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.thread-row .subj a { color: var(--title-1); text-decoration: none; }
+.thread-row .subj a:hover { text-decoration: underline; color: var(--link-hov); }
+.thread-row .by   { font: 11px var(--tahoma); color: #555; margin-top: 2px; }
+.thread-row .counts { text-align: center; font: 11px var(--tahoma); color: #555; }
+.thread-row .counts .n   { font-family: var(--lcd); font-size: 22px; color: var(--title-1); line-height: 1; }
+.thread-row .counts .lbl { color: #777; }
+.thread-row .counts .last { font-size: 10px; margin-top: 2px; }
+
+.post.op > .body { background: #fffce8; }   /* OP body slightly highlighted */
+
+.thread-mini {
+    padding: 6px 0;
+    border-bottom: 1px dotted #999;
+}
+.thread-mini:last-child { border-bottom: none; }
+.thread-mini .subj a {
+    font: bold 12px var(--tahoma);
+    color: var(--title-1);
+    text-decoration: none;
+}
+.thread-mini .subj a:hover { text-decoration: underline; color: var(--link-hov); }
+.thread-mini .by { font: 11px var(--tahoma); color: #555; margin-top: 2px; }
+
 /* ---------- trending grid (Spotify cover cards) ---------- */
 .trending-grid {
     display: grid;

@@ -47,7 +47,7 @@
         <span class="brand">Pacer</span>
         <span class="spark">✦</span>
     </a>
-    <div class="tag">★ a place for music ★ est. {{ now.year }} ★</div>
+    <div class="tag">★ Review your music ★</div>
 </div>
 
 <nav class="nav">
@@ -55,6 +55,7 @@
     <a href="{{ url_for('browse') }}">📊 Charts</a>
     <a href="{{ url_for('browse', sort='new') }}">✨ New</a>
     <a href="{{ url_for('browse', sort='hot') }}">🔥 Hot</a>
+    <a href="{{ url_for('blog_list') }}">📝 Blog</a>
     {% if current_user %}
         <a href="{{ url_for('profile', username=current_user['username']) }}">👤 My Profile</a>
     {% else %}
@@ -79,6 +80,7 @@
         <a href="{{ url_for('home') }}">🏠 Home</a>
         <a href="{{ url_for('browse') }}">📊 Charts</a>
         <a href="{{ url_for('browse', sort='new') }}">✨ New Tracks</a>
+        <a href="{{ url_for('blog_list') }}">📝 Blog Threads</a>
         <hr>
         {% if current_user %}
             <a href="{{ url_for('profile', username=current_user['username']) }}">👤 My Profile</a>

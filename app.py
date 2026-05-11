@@ -204,6 +204,22 @@ CREATE TABLE IF NOT EXISTS comments (
     body        TEXT NOT NULL,
     created_at  TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS threads (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id),
+    subject    TEXT NOT NULL,
+    body       TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS thread_replies (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    thread_id  INTEGER NOT NULL REFERENCES threads(id),
+    user_id    INTEGER NOT NULL REFERENCES users(id),
+    body       TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 """
 
 
@@ -375,6 +391,17 @@ def home():
     if top_songs:
         bnm = top_songs[0]
     trending = fetch_spotify_trending(limit=12)
+    recent_threads = db.execute("""
+        SELECT t.id, t.subject, t.created_at, u.username,
+               (SELECT COUNT(*) FROM thread_replies r WHERE r.thread_id = t.id) AS reply_count,
+               COALESCE(
+                 (SELECT MAX(r.created_at) FROM thread_replies r WHERE r.thread_id = t.id),
+                 t.created_at
+               ) AS last_activity
+        FROM threads t JOIN users u ON u.id = t.user_id
+        ORDER BY last_activity DESC, t.id DESC
+        LIMIT 6
+    """).fetchall()
     return render_template(
         "home.html",
         top_songs=top_songs,
@@ -384,6 +411,7 @@ def home():
         counts=counts,
         bnm=bnm,
         trending=trending,
+        recent_threads=recent_threads,
     )
 
 
@@ -697,6 +725,78 @@ def song_detail(song_id):
         "song.html", song=song, stats=stats, histogram=histogram,
         max_h=max_h, reviews=reviews, featured=featured, my_rating=my_rating,
     )
+
+
+# ---------- blog (user threads) ----------
+
+@app.route("/blog")
+def blog_list():
+    db = get_db()
+    threads = db.execute("""
+        SELECT t.*, u.username, u.avatar_emoji,
+               (SELECT COUNT(*) FROM thread_replies r WHERE r.thread_id = t.id) AS reply_count,
+               (SELECT MAX(r.created_at) FROM thread_replies r WHERE r.thread_id = t.id) AS last_reply
+        FROM threads t
+        JOIN users u ON u.id = t.user_id
+        ORDER BY COALESCE(
+            (SELECT MAX(r.created_at) FROM thread_replies r WHERE r.thread_id = t.id),
+            t.created_at
+        ) DESC, t.id DESC
+        LIMIT 100
+    """).fetchall()
+    return render_template("blog_list.html", threads=threads)
+
+
+@app.route("/blog/new", methods=["POST"])
+@login_required
+def blog_new():
+    subject = (request.form.get("subject") or "").strip()
+    body    = (request.form.get("body") or "").strip()
+    if not subject or not body:
+        flash("Subject and body are required.", "warn")
+        return redirect(url_for("blog_list"))
+    db = get_db()
+    cur = db.execute(
+        "INSERT INTO threads (user_id, subject, body, created_at) VALUES (?,?,?,?)",
+        (session["user_id"], subject[:140], body[:5000],
+         datetime.utcnow().isoformat(timespec="seconds")),
+    )
+    db.commit()
+    flash("Thread posted.", "ok")
+    return redirect(url_for("blog_thread", thread_id=cur.lastrowid))
+
+
+@app.route("/blog/<int:thread_id>", methods=["GET", "POST"])
+def blog_thread(thread_id):
+    db = get_db()
+    thread = db.execute("""
+        SELECT t.*, u.username, u.avatar_emoji
+        FROM threads t JOIN users u ON u.id = t.user_id
+        WHERE t.id = ?
+    """, (thread_id,)).fetchone()
+    if not thread:
+        abort(404)
+
+    if request.method == "POST":
+        if not session.get("user_id"):
+            flash("Log in to reply.", "warn")
+            return redirect(url_for("login", next=request.path))
+        body = (request.form.get("body") or "").strip()
+        if body:
+            db.execute(
+                "INSERT INTO thread_replies (thread_id, user_id, body, created_at) VALUES (?,?,?,?)",
+                (thread_id, session["user_id"], body[:5000],
+                 datetime.utcnow().isoformat(timespec="seconds")),
+            )
+            db.commit()
+        return redirect(url_for("blog_thread", thread_id=thread_id))
+
+    replies = db.execute("""
+        SELECT r.*, u.username, u.avatar_emoji
+        FROM thread_replies r JOIN users u ON u.id = r.user_id
+        WHERE r.thread_id = ? ORDER BY r.id ASC
+    """, (thread_id,)).fetchall()
+    return render_template("blog_thread.html", thread=thread, replies=replies)
 
 
 @app.route("/bulletins/new", methods=["POST"])
@@ -1018,6 +1118,56 @@ def seed_demo():
         db.execute(
             "INSERT INTO comments (profile_id,author_id,body,created_at) VALUES (?,?,?,?)",
             (user_ids[profile_u], user_ids[author_u], body, now),
+        )
+
+    seed_threads = [
+        ("brunette", "what's the best album of the last 5 years?",
+         "going to bat for Punisher. annual replay every fall, every fall it still hits.\n"
+         "what's yours? defend your pick."),
+        ("kamal", "is hyperpop dead?",
+         ">say hyperpop is dead\n>get told to listen to the new 100 gecs\n>turns out it was fine\n"
+         "honest take: the scene's mainstream era is over, the experimental wing is healthier than ever."),
+        ("anon", "rate my last.fm",
+         ">3 plays of mclusky\n>500 plays of one Carly Rae Jepsen song\n"
+         "be honest. no mercy."),
+        ("dustyn", "yacht rock starter pack",
+         "for friends new to the genre. ranked:\n"
+         "1. Aja - Steely Dan\n"
+         "2. Christopher Cross s/t\n"
+         "3. Off the Wall\n"
+         "fight me on the order."),
+        ("layouts", "ambient album recommendations",
+         "I've been on a Tim Hecker kick for months. need fresh stuff.\n"
+         "drone, modular, field recording — anything goes. drop names."),
+    ]
+    thread_ids = {}
+    for u, subj, body in seed_threads:
+        c = db.execute(
+            "INSERT INTO threads (user_id, subject, body, created_at) VALUES (?,?,?,?)",
+            (user_ids[u], subj, body, now),
+        )
+        thread_ids[subj] = c.lastrowid
+
+    seed_replies = [
+        ("what's the best album of the last 5 years?", "joey",    "obvious answer is Charli XCX - BRAT. sorry not sorry."),
+        ("what's the best album of the last 5 years?", "kamal",   "Black Country, New Road - Ants From Up There. closes the case."),
+        ("what's the best album of the last 5 years?", "anon",    ">>1\nBRAT is fine but it isn't even her best."),
+        ("is hyperpop dead?",                          "joey",    "hyperpop didn't die, it just got distributed across mainstream pop production. listen to any top 40 track lately."),
+        ("is hyperpop dead?",                          "tom",     "kinda agree. the boundary moved."),
+        ("rate my last.fm",                            "brunette","this is a cry for help."),
+        ("rate my last.fm",                            "kamal",   "the carly rae fixation is correct, the mclusky shame is not."),
+        ("yacht rock starter pack",                    "kamal",   "putting Off the Wall in yacht rock is a crime"),
+        ("yacht rock starter pack",                    "tom",     "actually Off the Wall has yacht rock energy throughout. hot take respected."),
+        ("ambient album recommendations",              "brunette","Grouper - Ruins. recorded in a tiny house in Portugal. unbeatable."),
+        ("ambient album recommendations",              "anon",    "Stars of the Lid - The Tired Sounds of. don't sleep on it (but also do)."),
+    ]
+    for subj, author, body in seed_replies:
+        tid = thread_ids.get(subj)
+        if not tid:
+            continue
+        db.execute(
+            "INSERT INTO thread_replies (thread_id, user_id, body, created_at) VALUES (?,?,?,?)",
+            (tid, user_ids[author], body, now),
         )
 
     db.commit()
