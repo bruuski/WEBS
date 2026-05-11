@@ -2,22 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>{% block title %}TuneSpace ✦ rate the songs in your head{% endblock %}</title>
+<title>{% block title %}Pacer ✦ rate the songs in your head{% endblock %}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body class="theme-{{ (current_user['theme'] if current_user else 'sky') }}">
 
-<div class="topbar">
-    <div>
-        <span class="menu-item"><u>F</u>ile</span>
-        <span class="menu-item"><u>E</u>dit</span>
-        <span class="menu-item"><u>V</u>iew</span>
-        <a href="{{ url_for('browse') }}"><u>G</u>o</a>
-        <a href="{{ url_for('home') }}"><u>H</u>ome</a>
-        <span class="menu-item"><u>?</u></span>
-    </div>
-    <div>
+<div class="masthead">
+    <div class="auth-strip">
         {% if current_user %}
             <a href="{{ url_for('profile', username=current_user['username']) }}">@{{ current_user['username'] }}</a>
             · <a href="{{ url_for('edit_profile') }}">Settings</a>
@@ -27,14 +19,34 @@
             · <a href="{{ url_for('signup') }}">Sign Up</a>
         {% endif %}
     </div>
-</div>
 
-<div class="masthead">
-    <div class="brand-row">
+    <a href="{{ url_for('home') }}" class="brand-link" aria-label="Pacer home">
+        <svg class="logo-svg" viewBox="0 0 88 88" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <!-- cat ears (behind/under main disc) -->
+            <path d="M14 30 L22 6 L36 26 Z"
+                  fill="#1db954" stroke="#000" stroke-width="2.5" stroke-linejoin="round"/>
+            <path d="M52 26 L66 6 L74 30 Z"
+                  fill="#1db954" stroke="#000" stroke-width="2.5" stroke-linejoin="round"/>
+            <!-- inner pink ears -->
+            <path d="M22 24 L24 12 L31 22 Z" fill="#ff8cc6"/>
+            <path d="M57 22 L64 12 L66 24 Z" fill="#ff8cc6"/>
+            <!-- main disc -->
+            <circle cx="44" cy="48" r="34"
+                    fill="#1db954" stroke="#000" stroke-width="2.5"/>
+            <!-- soundwave arcs (Spotify-style whiskers) -->
+            <path d="M22 40 Q44 30 66 40"
+                  stroke="#000" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+            <path d="M26 50 Q44 42 62 50"
+                  stroke="#000" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+            <path d="M30 60 Q44 54 58 60"
+                  stroke="#000" stroke-width="3"   fill="none" stroke-linecap="round"/>
+            <!-- eyes -->
+            <ellipse cx="34" cy="36" rx="2.2" ry="2.6" fill="#000"/>
+            <ellipse cx="54" cy="36" rx="2.2" ry="2.6" fill="#000"/>
+        </svg>
+        <span class="brand">Pacer</span>
         <span class="spark">✦</span>
-        <span class="brand">TUNESPACE</span>
-        <span class="spark">✦</span>
-    </div>
+    </a>
     <div class="tag">★ a place for music ★ est. {{ now.year }} ★</div>
 </div>
 
@@ -43,7 +55,6 @@
     <a href="{{ url_for('browse') }}">📊 Charts</a>
     <a href="{{ url_for('browse', sort='new') }}">✨ New</a>
     <a href="{{ url_for('browse', sort='hot') }}">🔥 Hot</a>
-    <a href="{{ url_for('submit_song') }}">➕ Submit</a>
     {% if current_user %}
         <a href="{{ url_for('profile', username=current_user['username']) }}">👤 My Profile</a>
     {% else %}
@@ -63,12 +74,11 @@
 
 <!-- Start Menu popover -->
 <div class="start-menu" id="start-menu">
-    <div class="sidebar">TuneSpace</div>
+    <div class="sidebar">Pacer</div>
     <div class="items">
         <a href="{{ url_for('home') }}">🏠 Home</a>
         <a href="{{ url_for('browse') }}">📊 Charts</a>
         <a href="{{ url_for('browse', sort='new') }}">✨ New Tracks</a>
-        <a href="{{ url_for('submit_song') }}">➕ Submit a Track</a>
         <hr>
         {% if current_user %}
             <a href="{{ url_for('profile', username=current_user['username']) }}">👤 My Profile</a>
@@ -85,7 +95,7 @@
 <div class="taskbar">
     <a href="#" class="start-btn" id="start-btn" onclick="toggleStart(event)"><span class="logo"></span> Start</a>
     <div class="programs">
-        <a href="{{ url_for('home') }}" class="program {% if request.path == '/' %}active{% endif %}">🎵 TuneSpace</a>
+        <a href="{{ url_for('home') }}" class="program {% if request.path == '/' %}active{% endif %}">🎵 Pacer</a>
         {% if current_user %}
             <a href="{{ url_for('profile', username=current_user['username']) }}" class="program">👤 @{{ current_user['username'] }}</a>
         {% endif %}

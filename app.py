@@ -1,4 +1,4 @@
-"""TuneSpace -- music rating + reviews + Spotify."""
+"""Pacer -- music rating + reviews + Spotify trending."""
 import os
 import re
 import time
@@ -17,10 +17,10 @@ from flask import (
 )
 
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(APP_ROOT, "tunespace.db")
+DB_PATH = os.path.join(APP_ROOT, "pacer.db")
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("TUNESPACE_SECRET", "dev-secret-change-me")
+app.secret_key = os.environ.get("PACER_SECRET", "dev-secret-change-me")
 
 
 # ---------- Spotify config ----------
@@ -37,6 +37,84 @@ def spotify_configured():
 
 
 _app_token = {"value": None, "expires_at": 0}
+_trending_cache = {"items": [], "expires_at": 0}
+
+# "Today's Top Hits" -- well-known public playlist
+SPOTIFY_TRENDING_PLAYLIST = os.environ.get(
+    "SPOTIFY_TRENDING_PLAYLIST", "37i9dQZF1DXcBWIGoYBM5M"
+)
+
+
+def fetch_spotify_trending(limit=12):
+    """Pull a few trending tracks from Spotify, with a short in-process cache."""
+    if _trending_cache["items"] and _trending_cache["expires_at"] > time.time():
+        return _trending_cache["items"][:limit]
+    if not spotify_configured():
+        return []
+    token = get_app_spotify_token()
+    if not token:
+        return []
+    fields = ("items(track(id,name,artists(name),album(name,images,release_date),"
+              "external_urls,preview_url))")
+    try:
+        r = requests.get(
+            f"https://api.spotify.com/v1/playlists/{SPOTIFY_TRENDING_PLAYLIST}/tracks",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"limit": limit, "fields": fields},
+            timeout=8,
+        )
+    except requests.RequestException:
+        return []
+    if not r.ok:
+        # fallback: new releases (albums)
+        try:
+            r2 = requests.get(
+                "https://api.spotify.com/v1/browse/new-releases",
+                headers={"Authorization": f"Bearer {token}"},
+                params={"limit": limit},
+                timeout=8,
+            )
+        except requests.RequestException:
+            return []
+        if not r2.ok:
+            return []
+        items = []
+        for a in r2.json().get("albums", {}).get("items", []):
+            images = a.get("images") or []
+            items.append({
+                "id":      a.get("id"),
+                "name":    a.get("name"),
+                "artists": ", ".join(ar["name"] for ar in a.get("artists", [])),
+                "album":   a.get("name"),
+                "year":    (a.get("release_date") or "")[:4],
+                "image":   images[0]["url"] if images else None,
+                "url":     (a.get("external_urls") or {}).get("spotify"),
+                "preview": None,
+                "kind":    "album",
+            })
+        _trending_cache.update(items=items, expires_at=time.time() + 600)
+        return items[:limit]
+
+    items = []
+    for it in r.json().get("items", []):
+        t = it.get("track") or {}
+        if not t.get("id"):
+            continue
+        album = t.get("album") or {}
+        images = album.get("images") or []
+        items.append({
+            "id":      t.get("id"),
+            "name":    t.get("name"),
+            "artists": ", ".join(a["name"] for a in t.get("artists", [])),
+            "album":   album.get("name"),
+            "year":    (album.get("release_date") or "")[:4],
+            "image":   images[0]["url"] if images else None,
+            "url":     (t.get("external_urls") or {}).get("spotify"),
+            "preview": t.get("preview_url"),
+            "kind":    "track",
+        })
+    _trending_cache.update(items=items, expires_at=time.time() + 600)
+    return items[:limit]
 
 
 def get_app_spotify_token():
@@ -296,6 +374,7 @@ def home():
     bnm = None
     if top_songs:
         bnm = top_songs[0]
+    trending = fetch_spotify_trending(limit=12)
     return render_template(
         "home.html",
         top_songs=top_songs,
@@ -304,6 +383,7 @@ def home():
         online_users=online_users,
         counts=counts,
         bnm=bnm,
+        trending=trending,
     )
 
 
@@ -497,40 +577,64 @@ def browse():
     return render_template("browse.html", songs=rows, q=q, sort=sort)
 
 
-@app.route("/songs/new", methods=["GET", "POST"])
-@login_required
-def submit_song():
-    if request.method == "POST":
-        title = (request.form.get("title") or "").strip()
-        artist = (request.form.get("artist") or "").strip()
-        if not title or not artist:
-            flash("Title and artist are required.", "warn")
-            return render_template("submit_song.html")
-        album = (request.form.get("album") or "").strip()
-        genre = (request.form.get("genre") or "").strip()
-        link = (request.form.get("link") or "").strip()
-        try:
-            year = int(request.form.get("year") or 0) or None
-        except ValueError:
-            year = None
-        sp_id     = (request.form.get("spotify_id") or "").strip()[:64] or None
-        sp_url    = (request.form.get("spotify_url") or "").strip()[:300] or None
-        sp_image  = (request.form.get("spotify_image") or "").strip()[:400] or None
-        sp_prev   = (request.form.get("spotify_preview_url") or "").strip()[:400] or None
-        db = get_db()
-        cur = db.execute(
-            """INSERT INTO songs (title, artist, album, year, genre, link, submitted_by, created_at,
-                                  spotify_id, spotify_url, spotify_image, spotify_preview_url)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (title[:120], artist[:120], album[:120], year, genre[:60],
-             link[:300], session["user_id"],
-             datetime.utcnow().isoformat(timespec="seconds"),
-             sp_id, sp_url, sp_image, sp_prev),
+def _find_or_create_song_from_spotify(spotify_id):
+    """Look up a song by spotify_id; create one from Spotify metadata if missing."""
+    if not spotify_id:
+        return None
+    db = get_db()
+    row = db.execute("SELECT id FROM songs WHERE spotify_id = ?", (spotify_id,)).fetchone()
+    if row:
+        return row["id"]
+    token = get_app_spotify_token()
+    if not token:
+        return None
+    try:
+        r = requests.get(
+            f"https://api.spotify.com/v1/tracks/{spotify_id}",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=8,
         )
-        db.commit()
-        flash("Song added.", "ok")
-        return redirect(url_for("song_detail", song_id=cur.lastrowid))
-    return render_template("submit_song.html")
+    except requests.RequestException:
+        return None
+    if not r.ok:
+        return None
+    t = r.json()
+    album = t.get("album") or {}
+    images = album.get("images") or []
+    submitter_row = db.execute("SELECT id FROM users ORDER BY id ASC LIMIT 1").fetchone()
+    if not submitter_row:
+        return None
+    cur = db.execute(
+        """INSERT INTO songs (title, artist, album, year, genre, link, submitted_by, created_at,
+                              spotify_id, spotify_url, spotify_image, spotify_preview_url)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (
+            t.get("name", "")[:120],
+            ", ".join(a["name"] for a in t.get("artists", []))[:120],
+            (album.get("name") or "")[:120],
+            int((album.get("release_date") or "0000")[:4] or 0) or None,
+            None,
+            (t.get("external_urls") or {}).get("spotify"),
+            submitter_row["id"],
+            datetime.utcnow().isoformat(timespec="seconds"),
+            t.get("id"),
+            (t.get("external_urls") or {}).get("spotify"),
+            images[0]["url"] if images else None,
+            t.get("preview_url"),
+        ),
+    )
+    db.commit()
+    return cur.lastrowid
+
+
+@app.route("/track/spotify/<spotify_id>")
+def track_from_spotify(spotify_id):
+    """Land on a local song page for a Spotify track, creating it if needed."""
+    song_id = _find_or_create_song_from_spotify(spotify_id)
+    if not song_id:
+        flash("Couldn't look up that track on Spotify.", "warn")
+        return redirect(url_for("home"))
+    return redirect(url_for("song_detail", song_id=song_id))
 
 
 @app.route("/songs/<int:song_id>", methods=["GET", "POST"])
@@ -893,7 +997,7 @@ def seed_demo():
         ("kamal",    "Pitchfork is wrong about the new BCNR","change my mind in the comments."),
         ("joey",     "hyperpop is real music",                ">be me\n>defend Charli\n>get bullied\n>still right"),
         ("layouts",  "playlist: studio bg loops",             "uploaded 12 ambient loops. take em or leave em."),
-        ("tom",      "TuneSpace v2 is live",                  "spotify search, new look, same ratings."),
+        ("tom",      "Pacer is live",                         "trending tracks, new look, same ratings."),
         ("anon",     "rate my taste",                         ">>1\nstop projecting"),
     ]
     for u, s, b in bulletins:

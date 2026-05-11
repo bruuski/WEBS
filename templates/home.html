@@ -1,13 +1,40 @@
 {% extends "base.html" %}
 {% block content %}
 
+{% if trending %}
+<div class="panel">
+    <h2>★ Trending Now — from Spotify</h2>
+    <div class="body">
+        <div class="trending-grid">
+            {% for t in trending %}
+                <a class="trending-card" href="{{ url_for('track_from_spotify', spotify_id=t['id']) }}" title="Rate {{ t['name'] }} by {{ t['artists'] }}">
+                    <div class="cover"{% if t['image'] %} style="background-image:url('{{ t['image'] }}');"{% endif %}></div>
+                    <div class="t">{{ t['name'] }}</div>
+                    <div class="a">{{ t['artists'] }}</div>
+                </a>
+            {% endfor %}
+        </div>
+        <div style="margin-top:8px; font: 11px var(--tahoma); color:#444;">
+            Pulled live from Spotify · click a track to rate it on Pacer.
+        </div>
+    </div>
+</div>
+{% elif spotify_enabled %}
+<div class="panel">
+    <h2>★ Trending Now — from Spotify</h2>
+    <div class="body">
+        <div class="sp-disabled">Spotify isn't returning trending data right now. Try again in a few minutes.</div>
+    </div>
+</div>
+{% endif %}
+
 {% if bnm %}
 <div class="feature">
-    <div class="titlebar"><span>★ Top of the Chart — TuneSpace</span></div>
+    <div class="titlebar"><span>★ Top of the Chart — Pacer</span></div>
     <div class="inner">
         <div>
             <div class="bnm">Best New Track</div>
-            <div class="kicker">submitted by <a href="{{ url_for('profile', username=bnm['submitter']) }}">@{{ bnm['submitter'] }}</a></div>
+            <div class="kicker">picked by <a href="{{ url_for('profile', username=bnm['submitter']) }}">@{{ bnm['submitter'] }}</a></div>
             <div class="song-title">
                 <a href="{{ url_for('song_detail', song_id=bnm['id']) }}" style="text-decoration:none;">{{ bnm['title'] }}</a>
             </div>
@@ -30,7 +57,7 @@
 
     <div class="panel">
         <h2>Site</h2>
-        <div class="body" style="font-family: var(--mono); font-size: 12px;">
+        <div class="body" style="font-family: var(--tahoma); font-size: 12px;">
             <div>Members <b>{{ counts['users'] }}</b></div>
             <div>Tracks <b>{{ counts['songs'] }}</b></div>
             <div>Ratings <b>{{ counts['ratings'] }}</b></div>
@@ -73,7 +100,7 @@
         <div class="body" style="padding-left:0; padding-right:0;">
         <table class="songlist">
             <thead><tr>
-                <th>#</th><th>Track</th><th>Score</th><th>Votes</th><th>Submitted</th>
+                <th>#</th><th>Track</th><th>Score</th><th>Votes</th><th>Picked by</th>
             </tr></thead>
             <tbody>
             {% for s in top_songs %}
@@ -81,14 +108,14 @@
                     <td><span class="num">{{ loop.index }}</span></td>
                     <td>
                         <div><a href="{{ url_for('song_detail', song_id=s['id']) }}" style="font-weight:600;">{{ s['title'] }}</a></div>
-                        <div style="color:var(--muted); font-size:12px;">{{ s['artist'] }}{% if s['year'] %} · {{ s['year'] }}{% endif %}</div>
+                        <div style="color:#555; font-size:12px;">{{ s['artist'] }}{% if s['year'] %} · {{ s['year'] }}{% endif %}</div>
                     </td>
                     <td><span class="score sm">{{ s['avg_stars']|score10 }}</span></td>
-                    <td style="font-family:var(--mono);">{{ s['rating_count'] }}</td>
-                    <td style="font-family:var(--mono); font-size:12px;"><a href="{{ url_for('profile', username=s['submitter']) }}">@{{ s['submitter'] }}</a></td>
+                    <td style="font-family:var(--tahoma);">{{ s['rating_count'] }}</td>
+                    <td style="font-family:var(--tahoma); font-size:12px;"><a href="{{ url_for('profile', username=s['submitter']) }}">@{{ s['submitter'] }}</a></td>
                 </tr>
             {% else %}
-                <tr><td colspan="5">no songs yet. <a href="{{ url_for('submit_song') }}">submit one →</a></td></tr>
+                <tr><td colspan="5">No tracks yet — try a trending pick above.</td></tr>
             {% endfor %}
             </tbody>
         </table>
@@ -96,12 +123,12 @@
     </div>
 
     <div class="panel flat">
-        <h2>New Submissions</h2>
+        <h2>New Tracks</h2>
         <div class="body" style="padding-left:0; padding-right:0;">
             {% for s in fresh_songs %}
-                <div style="padding:8px 0; border-bottom:1px dotted var(--line);">
-                    <div><a href="{{ url_for('song_detail', song_id=s['id']) }}" style="font-weight:600;">{{ s['title'] }}</a> — <span style="color:var(--muted);">{{ s['artist'] }}</span>{% if s['year'] %} <span class="kicker">· {{ s['year'] }}</span>{% endif %}</div>
-                    <div class="song-meta">added by <a href="{{ url_for('profile', username=s['submitter']) }}">@{{ s['submitter'] }}</a> · {{ s['created_at']|datefmt }}</div>
+                <div style="padding:8px 0; border-bottom:1px dotted #999;">
+                    <div><a href="{{ url_for('song_detail', song_id=s['id']) }}" style="font-weight:600;">{{ s['title'] }}</a> — <span style="color:#555;">{{ s['artist'] }}</span>{% if s['year'] %} <span class="kicker">· {{ s['year'] }}</span>{% endif %}</div>
+                    <div class="song-meta">picked by <a href="{{ url_for('profile', username=s['submitter']) }}">@{{ s['submitter'] }}</a> · {{ s['created_at']|datefmt }}</div>
                 </div>
             {% else %}<div>nothing yet.</div>{% endfor %}
         </div>
@@ -121,9 +148,8 @@
                     <button class="sp-go">Go</button>
                 </div>
                 <div class="sp-results"></div>
-                <div style="margin-top:8px; font-family: var(--mono); font-size: 11px; color: var(--muted);">
-                    Click a result to open on Spotify.<br>
-                    To <i>add</i> a track to TuneSpace, use the <a href="{{ url_for('submit_song') }}">Submit page</a>.
+                <div style="margin-top:8px; font: 11px var(--tahoma); color:#555;">
+                    Click a result to open it on Spotify.
                 </div>
             </div>
             {% else %}

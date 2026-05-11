@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ song['title'] }} — {{ song['artist'] }} — TuneSpace{% endblock %}
+{% block title %}{{ song['title'] }} — {{ song['artist'] }} — Pacer{% endblock %}
 {% block content %}
 
 <div class="feature">
@@ -113,7 +113,7 @@
     <div class="panel">
         <h2>Permalink</h2>
         <div class="body" style="font-family: var(--mono); font-size: 12px; word-break: break-all;">
-            tunespace.com{{ url_for('song_detail', song_id=song['id']) }}
+            pacer.com{{ url_for('song_detail', song_id=song['id']) }}
         </div>
     </div>
 </div>

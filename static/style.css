@@ -1,4 +1,4 @@
-/* TuneSpace -- Y2K / Win98 / Bliss-sky */
+/* Pacer -- Y2K / Win98 / Bliss-sky */
 
 @import url('https://fonts.googleapis.com/css2?family=Russo+One&family=VT323&family=Pixelify+Sans:wght@400;700&display=swap');
 
@@ -94,23 +94,21 @@ a:hover { color: var(--link-hov); }
 
 img { max-width: 100%; display: block; }
 
-/* ---------- top chrome (menu bar) ---------- */
-.topbar {
-    background: var(--win-face);
-    border-bottom: 1px solid var(--win-shadow);
-    padding: 1px 4px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+/* ---------- auth strip (top-right of masthead) ---------- */
+.auth-strip {
+    position: absolute;
+    top: 8px;
+    right: 14px;
     font: 11px var(--tahoma);
+    background: rgba(255,255,255,0.75);
+    box-shadow: var(--outset-1);
+    padding: 3px 8px;
     color: #000;
 }
-.topbar a { color: #000; text-decoration: none; padding: 2px 8px; }
-.topbar a:hover { background: var(--title-1); color: #fff; }
-.topbar .menu-item { font-weight: 400; }
-.topbar .menu-item u { text-decoration: underline; }
+.auth-strip a { color: #000; text-decoration: none; }
+.auth-strip a:hover { color: var(--title-1); text-decoration: underline; }
 
-/* ---------- masthead (chrome italic brand) ---------- */
+/* ---------- masthead (logo + chrome italic brand) ---------- */
 .masthead {
     text-align: center;
     padding: 22px 16px 14px;
@@ -118,18 +116,27 @@ img { max-width: 100%; display: block; }
     background: transparent;
     border-bottom: none;
 }
-.masthead .brand-row {
+.brand-link {
     display: inline-flex;
     align-items: center;
-    gap: 18px;
+    gap: 14px;
+    text-decoration: none;
     line-height: 1;
+    padding: 4px 8px;
+}
+.brand-link:hover { text-decoration: none; }
+.brand-link:hover .brand { filter: drop-shadow(2px 3px 0 rgba(0,0,80,0.6)); }
+.logo-svg {
+    width: 76px; height: 76px;
+    filter: drop-shadow(2px 3px 0 rgba(0,0,60,0.35));
+    flex-shrink: 0;
 }
 .masthead .brand {
     font-family: var(--display);
     font-style: italic;
     font-weight: 400;
-    font-size: 64px;
-    letter-spacing: 4px;
+    font-size: 68px;
+    letter-spacing: 2px;
     line-height: 0.9;
     background: linear-gradient(180deg, #ffffff 0%, #d8e8ff 25%, #4a73c8 50%, #16317a 51%, #4a73c8 70%, #ffffff 100%);
     -webkit-background-clip: text;
@@ -141,12 +148,14 @@ img { max-width: 100%; display: block; }
 .masthead .brand .dot { color: inherit; }
 .masthead .spark {
     font-family: var(--tahoma);
-    font-size: 28px;
+    font-size: 24px;
     color: #fff;
     text-shadow:
         0 0 4px #b0d4ff,
         0 0 10px #4a90ff,
         0 0 18px #1a4faa;
+    align-self: flex-start;
+    margin-top: 4px;
 }
 .masthead .tag {
     margin-top: 8px;
@@ -160,8 +169,10 @@ img { max-width: 100%; display: block; }
     box-shadow: 1px 1px 0 rgba(0,0,128,0.3);
 }
 @media (max-width: 600px) {
-    .masthead .brand { font-size: 40px; letter-spacing: 2px; }
-    .masthead .spark { font-size: 20px; }
+    .masthead .brand { font-size: 44px; letter-spacing: 1px; }
+    .masthead .spark { font-size: 18px; }
+    .logo-svg { width: 54px; height: 54px; }
+    .auth-strip { position: static; display: inline-block; margin-bottom: 10px; }
 }
 
 /* ---------- nav (toolbar with raised buttons) ---------- */
@@ -814,3 +825,46 @@ code {
 body.theme-cyber a { color: #b0d8ff; }
 body.theme-cyber a:visited { color: #d0a8ff; }
 body.theme-cyber a:hover { color: #ff80a0; }
+
+/* ---------- trending grid (Spotify cover cards) ---------- */
+.trending-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+}
+@media (max-width: 980px) { .trending-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 640px) { .trending-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 380px) { .trending-grid { grid-template-columns: repeat(2, 1fr); } }
+.trending-card {
+    display: block;
+    text-decoration: none;
+    color: #000;
+    background: var(--win-face);
+    box-shadow: var(--outset);
+    padding: 4px;
+    transition: none;
+}
+.trending-card:hover { color: #000; }
+.trending-card:active { box-shadow: var(--outset-press); }
+.trending-card .cover {
+    aspect-ratio: 1 / 1;
+    background: #000 center / cover no-repeat;
+    box-shadow: var(--sunken);
+    margin-bottom: 4px;
+}
+.trending-card .t {
+    font: bold 11px var(--tahoma);
+    color: #000;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.2;
+}
+.trending-card .a {
+    font: 11px var(--tahoma);
+    color: #444;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.2;
+}
