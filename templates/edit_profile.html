@@ -16,9 +16,9 @@
     <div class="row"><label>About Me (greentext with &gt;, quote with &gt;&gt;)</label><textarea name="about_me">{{ user['about_me'] }}</textarea></div>
     <div class="row"><label>Theme</label>
         <select name="theme">
-            {% for t in ['mag','noir','lab'] %}
-              <option value="{{ t }}" {% if user['theme']==t %}selected{% endif %}>{{ t }}</option>
-            {% endfor %}
+            <option value="sky"    {% if user['theme']=='sky'    %}selected{% endif %}>Sky (blue clouds)</option>
+            <option value="sunset" {% if user['theme']=='sunset' %}selected{% endif %}>Sunset (pink/orange)</option>
+            <option value="cyber"  {% if user['theme']=='cyber'  %}selected{% endif %}>Cyber (dark space)</option>
         </select>
     </div>
     <button type="submit">Save</button>

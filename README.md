@@ -1,11 +1,11 @@
 # TuneSpace
 
-A music ratings + reviews site with a Spotify search widget. Editorial aesthetic — Pitchfork-style scores, Genius-style featured review blocks, 4chan-style threaded posts (greentext supported), and an "online now" grid. Flask + SQLite, no build step.
+A music ratings + reviews site with a Spotify search widget. Y2K / Windows-98 aesthetic — chrome italic brand, sky-and-clouds wallpaper, beveled gray windows for every panel, a 7-segment LCD readout for the song score, Post-It featured reviews, threaded posts with greentext, and a working Win98 taskbar (Start menu + live clock). Flask + SQLite, no build step.
 
 ## Features
 
 - Sign up / log in (scrypt-hashed passwords)
-- Profile with avatar, mood, headline, About Me, favorite artists, and three themes (mag / noir / lab)
+- Profile with avatar, mood, headline, About Me, favorite artists, and three themes (sky / sunset / cyber)
 - Submit tracks (title, artist, album, year, genre, listen URL) — or pick from Spotify search to autofill
 - Rate any track 1–5 stars and write a review (one rating per user per song, editable)
 - Pitchfork-style decimal score `7.8/10` derived from the average

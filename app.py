@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS users (
     location      TEXT DEFAULT '',
     age           INTEGER,
     avatar_emoji  TEXT DEFAULT '◉',
-    theme         TEXT DEFAULT 'mag',
+    theme         TEXT DEFAULT 'sky',
     created_at    TEXT NOT NULL,
     last_login    TEXT,
     spotify_id            TEXT,
@@ -316,7 +316,7 @@ def signup():
         location = (request.form.get("location") or "").strip()
         age_raw = request.form.get("age") or ""
         fav_bands = (request.form.get("fav_bands") or "").strip()
-        theme = request.form.get("theme") or "mag"
+        theme = request.form.get("theme") or "sky"
 
         if not USERNAME_RE.match(username):
             flash("Username must be 3-20 chars, letters/numbers/underscore only.", "warn")
@@ -448,7 +448,7 @@ def edit_profile():
             "fav_bands":    (request.form.get("fav_bands") or "").strip()[:1000],
             "location":     (request.form.get("location") or "").strip()[:80],
             "avatar_emoji": (request.form.get("avatar_emoji") or "◉")[:4],
-            "theme":         request.form.get("theme") or "mag",
+            "theme":         request.form.get("theme") or "sky",
         }
         try:
             fields["age"] = int(request.form.get("age") or 0) or None
@@ -817,13 +817,13 @@ def seed_demo():
         db.close()
         return
     users = [
-        ("tom",       "myspace",  "Tom",        "Santa Monica, CA",  29, "◉", "mag",     "the original.",                      "i'm here to help.",                                            "Beatles, Superdrag, Radiohead"),
-        ("brunette",  "password", "brunette",   "Anywhere, USA",     25, "✦", "mag",     "27 years old, still rating.",        "moody indie & sad-girl rock, mostly.",                         "Tegan and Sara, Mitski, Phoebe Bridgers"),
-        ("joey",      "password", "joey",       "Florida",           22, "✿", "mag",     "florida sunshine state of mind.",    "ex-boyband stan turned hyperpop convert.",                     "100 gecs, Charli XCX, Caroline Polachek"),
-        ("kamal",     "password", "kamal",      "Brooklyn, NY",      24, "♪", "noir",    "catch up. clean up. blog up.",       "writes too many words about three-minute songs.",              "U2, Gomez, Big Thief, Black Country, New Road"),
-        ("dustyn",    "password", "Dustyn",     "California",        24, "★", "noir",    "be careful what you put on shuffle.","yacht rock apologist.",                                        "Steely Dan, Toro y Moi, Mac DeMarco"),
-        ("layouts",   "password", "layouts",    "Metairie, LA",      28, "□", "lab",     "code in the morning, drone at night.","makes weird little instrumental loops.",                      "Tim Hecker, Grouper, Aphex Twin"),
-        ("anon",      "password", "anon",       "/mu/sic",           19, "?", "noir",    ">be me >rate songs >mfw",            "no waifu, no laifu. only ratings.",                            "Death Grips, Black Midi, JPEGMAFIA"),
+        ("tom",       "myspace",  "Tom",        "Santa Monica, CA",  29, "◉", "sky",     "the original.",                      "i'm here to help.",                                            "Beatles, Superdrag, Radiohead"),
+        ("brunette",  "password", "brunette",   "Anywhere, USA",     25, "✦", "sky",     "27 years old, still rating.",        "moody indie & sad-girl rock, mostly.",                         "Tegan and Sara, Mitski, Phoebe Bridgers"),
+        ("joey",      "password", "joey",       "Florida",           22, "✿", "sunset",  "florida sunshine state of mind.",    "ex-boyband stan turned hyperpop convert.",                     "100 gecs, Charli XCX, Caroline Polachek"),
+        ("kamal",     "password", "kamal",      "Brooklyn, NY",      24, "♪", "cyber",   "catch up. clean up. blog up.",       "writes too many words about three-minute songs.",              "U2, Gomez, Big Thief, Black Country, New Road"),
+        ("dustyn",    "password", "Dustyn",     "California",        24, "★", "sky",     "be careful what you put on shuffle.","yacht rock apologist.",                                        "Steely Dan, Toro y Moi, Mac DeMarco"),
+        ("layouts",   "password", "layouts",    "Metairie, LA",      28, "□", "cyber",   "code in the morning, drone at night.","makes weird little instrumental loops.",                      "Tim Hecker, Grouper, Aphex Twin"),
+        ("anon",      "password", "anon",       "/mu/sic",           19, "?", "cyber",   ">be me >rate songs >mfw",            "no waifu, no laifu. only ratings.",                            "Death Grips, Black Midi, JPEGMAFIA"),
     ]
     now = datetime.utcnow().isoformat(timespec="seconds")
     user_ids = {}

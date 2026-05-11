@@ -2,45 +2,52 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>{% block title %}TuneSpace — rate the songs in your head{% endblock %}</title>
+<title>{% block title %}TuneSpace ✦ rate the songs in your head{% endblock %}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-<body class="theme-{{ (current_user['theme'] if current_user else 'mag') }}">
+<body class="theme-{{ (current_user['theme'] if current_user else 'sky') }}">
 
 <div class="topbar">
     <div>
-        <a href="{{ url_for('home') }}">TUNESPACE</a>
-        <a href="{{ url_for('browse') }}">CHARTS</a>
-        <a href="{{ url_for('browse', sort='new') }}">NEW</a>
+        <span class="menu-item"><u>F</u>ile</span>
+        <span class="menu-item"><u>E</u>dit</span>
+        <span class="menu-item"><u>V</u>iew</span>
+        <a href="{{ url_for('browse') }}"><u>G</u>o</a>
+        <a href="{{ url_for('home') }}"><u>H</u>ome</a>
+        <span class="menu-item"><u>?</u></span>
     </div>
     <div>
         {% if current_user %}
-            logged in as <a href="{{ url_for('profile', username=current_user['username']) }}">@{{ current_user['username'] }}</a>
-            · <a href="{{ url_for('edit_profile') }}">edit</a>
-            · <a href="{{ url_for('logout') }}">logout</a>
+            <a href="{{ url_for('profile', username=current_user['username']) }}">@{{ current_user['username'] }}</a>
+            · <a href="{{ url_for('edit_profile') }}">Settings</a>
+            · <a href="{{ url_for('logout') }}">Log Off</a>
         {% else %}
-            <a href="{{ url_for('login') }}">log in</a>
-            · <a href="{{ url_for('signup') }}">sign up</a>
+            <a href="{{ url_for('login') }}">Log On</a>
+            · <a href="{{ url_for('signup') }}">Sign Up</a>
         {% endif %}
     </div>
 </div>
 
 <div class="masthead">
-    <div class="brand">TUNESPACE<span class="dot">.</span></div>
-    <div class="tag">criticism · ratings · noise · since {{ now.year }}</div>
+    <div class="brand-row">
+        <span class="spark">✦</span>
+        <span class="brand">TUNESPACE</span>
+        <span class="spark">✦</span>
+    </div>
+    <div class="tag">★ a place for music ★ est. {{ now.year }} ★</div>
 </div>
 
 <nav class="nav">
-    <a href="{{ url_for('home') }}">Home</a>
-    <a href="{{ url_for('browse') }}">Charts</a>
-    <a href="{{ url_for('browse', sort='new') }}">New</a>
-    <a href="{{ url_for('browse', sort='hot') }}">Most Voted</a>
-    <a href="{{ url_for('submit_song') }}">Submit</a>
+    <a href="{{ url_for('home') }}">🏠 Home</a>
+    <a href="{{ url_for('browse') }}">📊 Charts</a>
+    <a href="{{ url_for('browse', sort='new') }}">✨ New</a>
+    <a href="{{ url_for('browse', sort='hot') }}">🔥 Hot</a>
+    <a href="{{ url_for('submit_song') }}">➕ Submit</a>
     {% if current_user %}
-        <a href="{{ url_for('profile', username=current_user['username']) }}">Profile</a>
+        <a href="{{ url_for('profile', username=current_user['username']) }}">👤 My Profile</a>
     {% else %}
-        <a href="{{ url_for('signup') }}">Sign Up</a>
+        <a href="{{ url_for('signup') }}">📝 Sign Up</a>
     {% endif %}
 </nav>
 
@@ -54,14 +61,69 @@
 {% block content %}{% endblock %}
 </div>
 
-<div class="footer">
-    TUNESPACE © {{ now.year }} ·
-    <a href="{{ url_for('home') }}">home</a> ·
-    <a href="{{ url_for('browse') }}">charts</a> ·
-    <a href="{{ url_for('submit_song') }}">submit</a>
-    {% if not spotify_enabled %} · <span title="server admin: set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET">spotify: off</span>{% endif %}
+<!-- Start Menu popover -->
+<div class="start-menu" id="start-menu">
+    <div class="sidebar">TuneSpace</div>
+    <div class="items">
+        <a href="{{ url_for('home') }}">🏠 Home</a>
+        <a href="{{ url_for('browse') }}">📊 Charts</a>
+        <a href="{{ url_for('browse', sort='new') }}">✨ New Tracks</a>
+        <a href="{{ url_for('submit_song') }}">➕ Submit a Track</a>
+        <hr>
+        {% if current_user %}
+            <a href="{{ url_for('profile', username=current_user['username']) }}">👤 My Profile</a>
+            <a href="{{ url_for('edit_profile') }}">⚙ Settings</a>
+            <hr>
+            <a href="{{ url_for('logout') }}">🚪 Log Off…</a>
+        {% else %}
+            <a href="{{ url_for('login') }}">🔑 Log On…</a>
+            <a href="{{ url_for('signup') }}">📝 Sign Up</a>
+        {% endif %}
+    </div>
 </div>
 
+<div class="taskbar">
+    <a href="#" class="start-btn" id="start-btn" onclick="toggleStart(event)"><span class="logo"></span> Start</a>
+    <div class="programs">
+        <a href="{{ url_for('home') }}" class="program {% if request.path == '/' %}active{% endif %}">🎵 TuneSpace</a>
+        {% if current_user %}
+            <a href="{{ url_for('profile', username=current_user['username']) }}" class="program">👤 @{{ current_user['username'] }}</a>
+        {% endif %}
+        {% if spotify_enabled %}
+            <span class="program">🟢 Spotify</span>
+        {% endif %}
+    </div>
+    <div class="tray">
+        <span class="ico" title="volume">🔊</span>
+        <span class="ico" title="network">📶</span>
+        <span class="clock" id="clock">--:-- --</span>
+    </div>
+</div>
+
+<script>
+    (function () {
+        function tick() {
+            var d = new Date(), h = d.getHours(), m = d.getMinutes();
+            var ap = h >= 12 ? 'PM' : 'AM';
+            h = h % 12; if (h === 0) h = 12;
+            var s = h + ':' + (m < 10 ? '0' : '') + m + ' ' + ap;
+            var c = document.getElementById('clock');
+            if (c) c.textContent = s;
+        }
+        tick(); setInterval(tick, 15000);
+    })();
+    function toggleStart(ev) {
+        ev.preventDefault();
+        var m = document.getElementById('start-menu');
+        m.classList.toggle('open');
+    }
+    document.addEventListener('click', function (e) {
+        var m = document.getElementById('start-menu');
+        var b = document.getElementById('start-btn');
+        if (!m || !b) return;
+        if (!m.contains(e.target) && !b.contains(e.target)) m.classList.remove('open');
+    });
+</script>
 <script src="{{ url_for('static', filename='spotify.js') }}" defer></script>
 </body>
 </html>

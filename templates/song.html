@@ -3,28 +3,31 @@
 {% block content %}
 
 <div class="feature">
-    <div>
-        {% if stats['avg_stars'] and stats['avg_stars'] >= 4 %}
-            <div class="bnm">Highly Rated</div>
-        {% endif %}
-        <div class="kicker">Track · submitted by <a href="{{ url_for('profile', username=song['submitter']) }}">@{{ song['submitter'] }}</a></div>
-        <div class="song-title">{{ song['title'] }}</div>
-        <div class="song-artist">{{ song['artist'] }}{% if song['album'] %} · <i>{{ song['album'] }}</i>{% endif %}{% if song['year'] %} · {{ song['year'] }}{% endif %}</div>
-        <div class="song-meta">
-            {% if song['genre'] %}genre: {{ song['genre'] }} · {% endif %}
-            added {{ song['created_at']|datefmt }}
-            {% if song['link'] %} · <a href="{{ song['link'] }}" target="_blank" rel="noopener">listen ↗</a>{% endif %}
-        </div>
-        <div style="margin-top:18px; display:flex; align-items:flex-end; gap:14px;">
-            <div class="score">{{ stats['avg_stars']|score10 }}<span class="max">/10</span></div>
-            <div>
-                <div class="stars">{{ stats['avg_stars']|stars }}</div>
-                <div class="song-meta">{{ stats['n'] }} rating{{ '' if stats['n']==1 else 's' }}</div>
+    <div class="titlebar"><span>{{ song['title'] }} — {{ song['artist'] }}</span></div>
+    <div class="inner">
+        <div>
+            {% if stats['avg_stars'] and stats['avg_stars'] >= 4 %}
+                <div class="bnm">★ Highly Rated</div>
+            {% endif %}
+            <div class="kicker">Track · submitted by <a href="{{ url_for('profile', username=song['submitter']) }}">@{{ song['submitter'] }}</a></div>
+            <div class="song-title">{{ song['title'] }}</div>
+            <div class="song-artist">{{ song['artist'] }}{% if song['album'] %} · <i>{{ song['album'] }}</i>{% endif %}{% if song['year'] %} · {{ song['year'] }}{% endif %}</div>
+            <div class="song-meta">
+                {% if song['genre'] %}genre: {{ song['genre'] }} · {% endif %}
+                added {{ song['created_at']|datefmt }}
+                {% if song['link'] %} · <a href="{{ song['link'] }}" target="_blank" rel="noopener">listen ↗</a>{% endif %}
+            </div>
+            <div style="margin-top:18px; display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap;">
+                <div class="score">{{ stats['avg_stars']|score10 }}<span class="max">/10</span></div>
+                <div>
+                    <div class="stars">{{ stats['avg_stars']|stars }}</div>
+                    <div class="song-meta">{{ stats['n'] }} rating{{ '' if stats['n']==1 else 's' }}</div>
+                </div>
             </div>
         </div>
-    </div>
-    <div class="cover">
-        {% if song['spotify_image'] %}<img src="{{ song['spotify_image'] }}" alt="cover">{% else %}no cover{% endif %}
+        <div class="cover">
+            {% if song['spotify_image'] %}<img src="{{ song['spotify_image'] }}" alt="cover">{% else %}no cover{% endif %}
+        </div>
     </div>
 </div>
 

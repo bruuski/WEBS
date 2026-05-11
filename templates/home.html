@@ -3,20 +3,23 @@
 
 {% if bnm %}
 <div class="feature">
-    <div>
-        <div class="bnm">Best New Track</div>
-        <div class="kicker">Top of the chart · submitted by <a href="{{ url_for('profile', username=bnm['submitter']) }}">@{{ bnm['submitter'] }}</a></div>
-        <div class="song-title">
-            <a href="{{ url_for('song_detail', song_id=bnm['id']) }}" style="text-decoration:none;">{{ bnm['title'] }}</a>
+    <div class="titlebar"><span>★ Top of the Chart — TuneSpace</span></div>
+    <div class="inner">
+        <div>
+            <div class="bnm">Best New Track</div>
+            <div class="kicker">submitted by <a href="{{ url_for('profile', username=bnm['submitter']) }}">@{{ bnm['submitter'] }}</a></div>
+            <div class="song-title">
+                <a href="{{ url_for('song_detail', song_id=bnm['id']) }}" style="text-decoration:none;">{{ bnm['title'] }}</a>
+            </div>
+            <div class="song-artist">{{ bnm['artist'] }}{% if bnm['year'] %} · {{ bnm['year'] }}{% endif %}{% if bnm['album'] %} · <i>{{ bnm['album'] }}</i>{% endif %}</div>
+            <div style="margin-top:14px; display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap;">
+                <div class="score">{{ bnm['avg_stars']|score10 }}<span class="max">/10</span></div>
+                <div class="song-meta">{{ bnm['rating_count'] }} rating{{ '' if bnm['rating_count']==1 else 's' }} · <span class="stars">{{ bnm['avg_stars']|stars }}</span></div>
+            </div>
         </div>
-        <div class="song-artist">{{ bnm['artist'] }}{% if bnm['year'] %} · {{ bnm['year'] }}{% endif %}{% if bnm['album'] %} · <i>{{ bnm['album'] }}</i>{% endif %}</div>
-        <div style="margin-top:14px; display:flex; align-items:flex-end; gap:14px;">
-            <div class="score">{{ bnm['avg_stars']|score10 }}<span class="max">/10</span></div>
-            <div class="song-meta">{{ bnm['rating_count'] }} rating{{ '' if bnm['rating_count']==1 else 's' }} · <span class="stars">{{ bnm['avg_stars']|stars }}</span></div>
+        <div class="cover">
+            {% if bnm['spotify_image'] %}<img src="{{ bnm['spotify_image'] }}" alt="">{% else %}cover unavailable{% endif %}
         </div>
-    </div>
-    <div class="cover">
-        {% if bnm['spotify_image'] %}<img src="{{ bnm['spotify_image'] }}" alt="">{% else %}cover unavailable{% endif %}
     </div>
 </div>
 {% endif %}

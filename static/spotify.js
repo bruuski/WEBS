@@ -79,7 +79,7 @@
             // visual confirm
             var preview = widget.querySelector('.sp-picked');
             if (preview) {
-                preview.style.display = 'flex';
+                preview.style.display = 'block';
                 var img = preview.querySelector('img');
                 if (img && it.image) img.src = it.image;
                 var t = preview.querySelector('.t');
