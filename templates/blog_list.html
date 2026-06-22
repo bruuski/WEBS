@@ -9,21 +9,39 @@
         <h2>Blog · Threads ({{ threads|length }})</h2>
         <div class="body">
             {% if current_user %}
-            <form method="post" action="{{ url_for('blog_new') }}" style="margin-bottom:14px;">
+            <form method="post" action="{{ url_for('blog.blog_new') }}" style="margin-bottom:14px;">
                 <div class="row"><label>Subject</label><input type="text" name="subject" maxlength="140" required placeholder="what do you want to talk about?"></div>
                 <div class="row"><label>Body</label><textarea name="body" maxlength="5000" required placeholder="say your piece. greentext with >. quote with >>."></textarea></div>
+                <div class="thread-attach-actions">
+                    <button type="button" onclick="toggleThreadAttachMenu()" class="btn-small">📎 Attach</button>
+                </div>
+                <div id="thread-attach-menu" style="display:none; margin: 6px 0;">
+                    <button type="button" onclick="triggerThreadImage()" class="btn-small">🖼 Image</button>
+                    <button type="button" onclick="toggleThreadSongSearch()" class="btn-small">🎵 Song</button>
+                </div>
+                <input type="file" id="thread-image-file" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none" onchange="uploadThreadImage(this)">
+                <input type="hidden" name="image_cid" id="thread-image-cid" value="">
+                <input type="hidden" name="song_id" id="thread-song-id" value="">
+                <div id="thread-song-search" style="display:none; margin: 6px 0;">
+                    <input type="text" placeholder="Search song..." style="width:100%; padding:4px; border:2px inset #808080;" oninput="searchThreadSong(this.value)">
+                    <div id="thread-song-results" class="playlist-add-results"></div>
+                </div>
+                <div id="thread-attachment-preview" class="reply-attachment-preview" style="display:none;">
+                    <span id="thread-attachment-text"></span>
+                    <button type="button" onclick="clearThreadAttachments()" class="btn-small">✕</button>
+                </div>
                 <button type="submit">+ Start Thread</button>
             </form>
             {% else %}
-            <p style="font: 12px var(--tahoma);"><a href="{{ url_for('login') }}">Log in</a> to start a thread.</p>
+            <p style="font: 12px var(--tahoma);"><a href="{{ url_for('auth.login') }}">Log in</a> to start a thread.</p>
             {% endif %}
 
             {% for t in threads %}
                 <div class="thread-row">
                     <div class="avatar sm">{{ t['avatar_emoji'] }}</div>
                     <div class="meat">
-                        <div class="subj"><a href="{{ url_for('blog_thread', thread_id=t['id']) }}">{{ t['subject'] }}</a></div>
-                        <div class="by">by <a href="{{ url_for('profile', username=t['username']) }}">@{{ t['username'] }}</a> · {{ t['created_at']|datefmt }}</div>
+                        <div class="subj"><a href="{{ url_for('blog.blog_thread', thread_id=t['id']) }}">{{ t['subject'] }}</a></div>
+                        <div class="by">by <a href="{{ url_for('profile.profile', username=t['username']) }}">@{{ t['username'] }}</a> · {{ t['created_at']|datefmt }}</div>
                     </div>
                     <div class="counts">
                         <div class="n">{{ t['reply_count'] }}</div>

@@ -2,139 +2,199 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>{% block title %}Pacer ✦ rate the songs in your head{% endblock %}</title>
+<title>{% block title %}Pacer{% endblock %}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="{{ url_for('static', filename='htmx.min.js') }}"></script>
+<script src="{{ url_for('static', filename='player.js') }}"></script>
 </head>
-<body class="theme-{{ (current_user['theme'] if current_user else 'sky') }}">
+<body class="theme-{{ current_user['palette'] if current_user and current_user['palette'] else 'modern' }}" hx-boost="true">
 
-<div class="masthead">
-    <div class="auth-strip">
-        {% if current_user %}
-            <a href="{{ url_for('profile', username=current_user['username']) }}">@{{ current_user['username'] }}</a>
-            · <a href="{{ url_for('edit_profile') }}">Settings</a>
-            · <a href="{{ url_for('logout') }}">Log Off</a>
-        {% else %}
-            <a href="{{ url_for('login') }}">Log On</a>
-            · <a href="{{ url_for('signup') }}">Sign Up</a>
-        {% endif %}
+<!-- Top Navigation Bar -->
+<header class="top-header">
+  <div class="header-left">
+    <a href="{{ url_for('feed.home') }}" class="header-logo">Pacer</a>
+    <nav class="header-nav">
+      <a href="{{ url_for('feed.home') }}" class="header-nav-link {% if request.path == '/' %}nav-active{% endif %}">Trending</a>
+      <a href="{{ url_for('music.browse') }}" class="header-nav-link {% if request.endpoint == 'music.browse' %}nav-active{% endif %}">Charts</a>
+      <a href="{{ url_for('spotify_bp.search_page') }}" class="header-nav-link {% if request.endpoint == 'spotify_bp.search_page' %}nav-active{% endif %}">Discover</a>
+      <a href="{{ url_for('blog.blog_list') }}" class="header-nav-link {% if request.endpoint and request.endpoint.startswith('blog') %}nav-active{% endif %}">Blogs</a>
+      {% if current_user %}
+      <a href="{{ url_for('profile.profile', username=current_user['username']) }}" class="header-nav-link {% if request.endpoint == 'profile.profile' %}nav-active{% endif %}">Profile</a>
+      {% endif %}
+    </nav>
+  </div>
+  <div class="header-right">
+  </div>
+</header>
+
+<!-- Main Layout Container -->
+<div class="layout-container">
+
+  <!-- Left Sidebar -->
+  <aside class="sidebar-left">
+    <nav class="sidebar-nav">
+      <a href="{{ url_for('blog.blog_list') }}" class="sidebar-link {% if request.endpoint and request.endpoint.startswith('blog') %}active{% endif %}">
+        <span class="material-symbols-outlined">group</span>
+        <span>Communities</span>
+      </a>
+      {% if current_user %}
+      <a href="{{ url_for('profile.profile', username=current_user['username']) }}#playlists" class="sidebar-link">
+        <span class="material-symbols-outlined">queue_music</span>
+        <span>Playlist</span>
+      </a>
+      {% endif %}
+      <button class="sidebar-link" onclick="togglePalettePicker()">
+        <span class="material-symbols-outlined">palette</span>
+        <span>Theme</span>
+      </button>
+    </nav>
+
+    <div id="palette-picker" class="palette-picker" style="display:none;">
+      <button onclick="setPalette('modern')" class="palette-option">Modern</button>
+      <button onclick="setPalette('win98')" class="palette-option">Win98</button>
+      <button onclick="setPalette('clean')" class="palette-option">Clean</button>
     </div>
 
-    <a href="{{ url_for('home') }}" class="brand-link" aria-label="Pacer home">
-        <svg class="logo-svg" viewBox="0 0 88 88" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <!-- cat ears (behind/under main disc) -->
-            <path d="M14 30 L22 6 L36 26 Z"
-                  fill="#1db954" stroke="#000" stroke-width="2.5" stroke-linejoin="round"/>
-            <path d="M52 26 L66 6 L74 30 Z"
-                  fill="#1db954" stroke="#000" stroke-width="2.5" stroke-linejoin="round"/>
-            <!-- inner pink ears -->
-            <path d="M22 24 L24 12 L31 22 Z" fill="#ff8cc6"/>
-            <path d="M57 22 L64 12 L66 24 Z" fill="#ff8cc6"/>
-            <!-- main disc -->
-            <circle cx="44" cy="48" r="34"
-                    fill="#1db954" stroke="#000" stroke-width="2.5"/>
-            <!-- soundwave arcs (Spotify-style whiskers) -->
-            <path d="M22 40 Q44 30 66 40"
-                  stroke="#000" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-            <path d="M26 50 Q44 42 62 50"
-                  stroke="#000" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-            <path d="M30 60 Q44 54 58 60"
-                  stroke="#000" stroke-width="3"   fill="none" stroke-linecap="round"/>
-            <!-- eyes -->
-            <ellipse cx="34" cy="36" rx="2.2" ry="2.6" fill="#000"/>
-            <ellipse cx="54" cy="36" rx="2.2" ry="2.6" fill="#000"/>
-        </svg>
-        <span class="brand">PACER</span>
-        <span class="spark">✦</span>
-    </a>
-    <div class="tag">★ music at your own pace ★</div>
+    <div class="sidebar-bottom">
+      {% if current_user %}
+        <a href="{{ url_for('profile.profile', username=current_user['username']) }}" class="sidebar-link">
+          <span class="material-symbols-outlined">person</span>
+          <span>@{{ current_user['username'] }}</span>
+        </a>
+        <a href="{{ url_for('auth.logout') }}" class="sidebar-link">
+          <span class="material-symbols-outlined">logout</span>
+          <span>Log Off</span>
+        </a>
+      {% else %}
+        <a href="{{ url_for('auth.signup') }}" class="sidebar-btn-primary">Sign up</a>
+        <a href="{{ url_for('auth.login') }}" class="sidebar-btn-outline">Log in</a>
+      {% endif %}
+    </div>
+  </aside>
+
+  <!-- Center Feed -->
+  <main id="content" class="center-feed" hx-target="this" hx-swap="innerHTML show:window:top" hx-select="#content > *">
+    <div class="page">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="flash {{ cat }}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  <!-- Right Sidebar -->
+  <aside class="sidebar-right">
+    <section class="sidebar-right-section">
+      <div class="sidebar-right-header">
+        <h3 class="sidebar-right-title">Trending Blogs</h3>
+      </div>
+      <div class="sidebar-right-list">
+        {% if trending_users is defined and trending_users %}
+          {% for u in trending_users[:5] %}
+          <div class="trending-user">
+            <div class="trending-user-avatar">{{ (u.get('display_name') or u['username'])[:2]|upper }}</div>
+            <div class="trending-user-info">
+              <a href="{{ url_for('profile.profile', username=u['username']) }}" class="trending-user-name">{{ u['display_name'] or u['username'] }}</a>
+              <span class="trending-user-handle">@{{ u['username'] }}</span>
+            </div>
+            <a href="{{ url_for('profile.profile', username=u['username']) }}" class="trending-user-btn">Follow</a>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="trending-user">
+            <div class="trending-user-avatar">PA</div>
+            <div class="trending-user-info">
+              <span class="trending-user-name">Pacer Community</span>
+              <span class="trending-user-handle">Discover new people</span>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    </section>
+
+    <div class="sidebar-right-footer">
+      <a href="#">About</a>
+      <a href="#">Apps</a>
+      <a href="#">Legal</a>
+      <a href="#">Privacy</a>
+      <a href="#">Help</a>
+    </div>
+  </aside>
+
 </div>
 
-<nav class="nav">
-    <a href="{{ url_for('home') }}"               class="{% if request.path == '/' %}active{% endif %}"><span class="ico">🏠</span><span class="lbl">Home</span></a>
-    <a href="{{ url_for('browse') }}"             class="{% if request.endpoint == 'browse' and request.args.get('sort','top') == 'top' %}active{% endif %}"><span class="ico">📊</span><span class="lbl">Charts</span></a>
-    <a href="{{ url_for('browse', sort='new') }}" class="{% if request.endpoint == 'browse' and request.args.get('sort') == 'new' %}active{% endif %}"><span class="ico">✨</span><span class="lbl">New</span></a>
-    <a href="{{ url_for('browse', sort='hot') }}" class="{% if request.endpoint == 'browse' and request.args.get('sort') == 'hot' %}active{% endif %}"><span class="ico">🔥</span><span class="lbl">Hot</span></a>
-    <a href="{{ url_for('blog_list') }}"          class="{% if request.endpoint and request.endpoint.startswith('blog') %}active{% endif %}"><span class="ico">📝</span><span class="lbl">Blog</span></a>
-    {% if current_user %}
-        <a href="{{ url_for('profile', username=current_user['username']) }}" class="{% if request.endpoint == 'profile' %}active{% endif %}"><span class="ico">👤</span><span class="lbl">Profile</span></a>
-    {% else %}
-        <a href="{{ url_for('signup') }}" class="{% if request.endpoint == 'signup' %}active{% endif %}"><span class="ico">📝</span><span class="lbl">Sign Up</span></a>
-    {% endif %}
+<!-- Mini Player (persistent) -->
+<div class="mini-player-bar">
+  <div id="mini-player" class="mini-player">
+    <div class="mini-player-info">
+      <span id="mini-player-title" class="mini-player-title">No track</span>
+    </div>
+    <div class="mini-player-controls">
+      <button class="btn-player" onclick="miniPrev()">&#9664;&#9664;</button>
+      <button id="mini-play-btn" class="btn-player" onclick="miniToggle()">&#9654;</button>
+      <button class="btn-player" onclick="miniNext()">&#9654;&#9654;</button>
+    </div>
+    <iframe id="spotify-mini-iframe" src="" width="0" height="0" allow="autoplay; encrypted-media" style="position:absolute;left:-9999px;"></iframe>
+  </div>
+</div>
+
+<!-- Mobile Bottom Navigation -->
+<nav class="mobile-nav">
+  <a href="{{ url_for('feed.home') }}" class="mobile-nav-item {% if request.path == '/' %}active{% endif %}">
+    <span class="material-symbols-outlined">trending_up</span>
+    <span>Trending</span>
+  </a>
+  <a href="{{ url_for('music.browse') }}" class="mobile-nav-item {% if request.endpoint == 'music.browse' %}active{% endif %}">
+    <span class="material-symbols-outlined">bar_chart</span>
+    <span>Charts</span>
+  </a>
+  <a href="{{ url_for('spotify_bp.search_page') }}" class="mobile-nav-item {% if request.endpoint == 'spotify_bp.search_page' %}active{% endif %}">
+    <span class="material-symbols-outlined">explore</span>
+    <span>Discover</span>
+  </a>
+  {% if current_user %}
+  <a href="{{ url_for('profile.profile', username=current_user['username']) }}" class="mobile-nav-item {% if request.endpoint == 'profile.profile' %}active{% endif %}">
+    <span class="material-symbols-outlined">person</span>
+    <span>Profile</span>
+  </a>
+  {% else %}
+  <a href="{{ url_for('auth.login') }}" class="mobile-nav-item">
+    <span class="material-symbols-outlined">login</span>
+    <span>Login</span>
+  </a>
+  {% endif %}
 </nav>
 
-<div class="page">
-{% with messages = get_flashed_messages(with_categories=true) %}
-  {% for cat, msg in messages %}
-    <div class="flash {{ cat }}">{{ msg }}</div>
-  {% endfor %}
-{% endwith %}
-
-{% block content %}{% endblock %}
-</div>
-
-<!-- Start Menu popover -->
-<div class="start-menu" id="start-menu">
-    <div class="sidebar">PACER</div>
-    <div class="items">
-        <a href="{{ url_for('home') }}">🏠 Home</a>
-        <a href="{{ url_for('browse') }}">📊 Charts</a>
-        <a href="{{ url_for('browse', sort='new') }}">✨ New Tracks</a>
-        <a href="{{ url_for('blog_list') }}">📝 Blog Threads</a>
-        <hr>
-        {% if current_user %}
-            <a href="{{ url_for('profile', username=current_user['username']) }}">👤 My Profile</a>
-            <a href="{{ url_for('edit_profile') }}">⚙ Settings</a>
-            <hr>
-            <a href="{{ url_for('logout') }}">🚪 Log Off…</a>
-        {% else %}
-            <a href="{{ url_for('login') }}">🔑 Log On…</a>
-            <a href="{{ url_for('signup') }}">📝 Sign Up</a>
-        {% endif %}
-    </div>
-</div>
-
-<div class="taskbar">
-    <a href="#" class="start-btn" id="start-btn" onclick="toggleStart(event)"><span class="logo"></span> Start</a>
-    <div class="programs">
-        <a href="{{ url_for('home') }}" class="program {% if request.path == '/' %}active{% endif %}">🎵 Pacer</a>
-        {% if current_user %}
-            <a href="{{ url_for('profile', username=current_user['username']) }}" class="program">👤 @{{ current_user['username'] }}</a>
-        {% endif %}
-        {% if spotify_enabled %}
-            <span class="program">🟢 Spotify</span>
-        {% endif %}
-    </div>
-    <div class="tray">
-        <span class="ico" title="volume">🔊</span>
-        <span class="ico" title="network">📶</span>
-        <span class="clock" id="clock">--:-- --</span>
-    </div>
-</div>
-
 <script>
-    (function () {
-        function tick() {
-            var d = new Date(), h = d.getHours(), m = d.getMinutes();
-            var ap = h >= 12 ? 'PM' : 'AM';
-            h = h % 12; if (h === 0) h = 12;
-            var s = h + ':' + (m < 10 ? '0' : '') + m + ' ' + ap;
-            var c = document.getElementById('clock');
-            if (c) c.textContent = s;
-        }
-        tick(); setInterval(tick, 15000);
-    })();
-    function toggleStart(ev) {
-        ev.preventDefault();
-        var m = document.getElementById('start-menu');
-        m.classList.toggle('open');
-    }
-    document.addEventListener('click', function (e) {
-        var m = document.getElementById('start-menu');
-        var b = document.getElementById('start-btn');
-        if (!m || !b) return;
-        if (!m.contains(e.target) && !b.contains(e.target)) m.classList.remove('open');
-    });
+// Palette switcher
+function togglePalettePicker() {
+  var el = document.getElementById('palette-picker');
+  el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+}
+
+function setPalette(palette) {
+  document.body.className = 'theme-' + palette;
+  localStorage.setItem('pacer-palette', palette);
+  document.getElementById('palette-picker').style.display = 'none';
+  fetch('/profile/palette', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: 'palette=' + palette
+  }).catch(function() {});
+}
+
+(function() {
+  var saved = localStorage.getItem('pacer-palette');
+  if (saved && ['modern', 'win98', 'clean'].indexOf(saved) !== -1) {
+    document.body.className = 'theme-' + saved;
+  }
+})();
 </script>
 <script src="{{ url_for('static', filename='spotify.js') }}" defer></script>
 </body>

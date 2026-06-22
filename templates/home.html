@@ -1,202 +1,29 @@
 {% extends "base.html" %}
+{% block title %}Pacer — Home{% endblock %}
 {% block content %}
-
-{% if trending %}
-<div class="panel">
-    <h2>★ Trending Now — from Spotify</h2>
-    <div class="body">
-        <div class="trending-grid">
-            {% for t in trending %}
-                <a class="trending-card" href="{{ url_for('track_from_spotify', spotify_id=t['id']) }}" title="Rate {{ t['name'] }} by {{ t['artists'] }}">
-                    <div class="cover"{% if t['image'] %} style="background-image:url('{{ t['image'] }}');"{% endif %}></div>
-                    <div class="t">{{ t['name'] }}</div>
-                    <div class="a">{{ t['artists'] }}</div>
-                </a>
-            {% endfor %}
-        </div>
-        <div style="margin-top:8px; font: 11px var(--tahoma); color:#444;">
-            Pulled live from Spotify · click a track to rate it on Pacer.
-        </div>
-    </div>
-</div>
-{% elif spotify_enabled %}
-<div class="panel">
-    <h2>★ Trending Now — from Spotify</h2>
-    <div class="body">
-        <div class="sp-disabled">Spotify isn't returning trending data right now. Try again in a few minutes.</div>
-    </div>
-</div>
-{% endif %}
-
-{% if bnm %}
-<div class="feature">
-    <div class="titlebar"><span>★ Top of the Chart — Pacer</span></div>
-    <div class="inner">
-        <div>
-            <div class="bnm">Best New Track</div>
-            <div class="kicker">picked by <a href="{{ url_for('profile', username=bnm['submitter']) }}">@{{ bnm['submitter'] }}</a></div>
-            <div class="song-title">
-                <a href="{{ url_for('song_detail', song_id=bnm['id']) }}" style="text-decoration:none;">{{ bnm['title'] }}</a>
-            </div>
-            <div class="song-artist">{{ bnm['artist'] }}{% if bnm['year'] %} · {{ bnm['year'] }}{% endif %}{% if bnm['album'] %} · <i>{{ bnm['album'] }}</i>{% endif %}</div>
-            <div style="margin-top:14px; display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap;">
-                <div class="score">{{ bnm['avg_stars']|score10 }}<span class="max">/10</span></div>
-                <div class="song-meta">{{ bnm['rating_count'] }} rating{{ '' if bnm['rating_count']==1 else 's' }} · <span class="stars">{{ bnm['avg_stars']|stars }}</span></div>
-            </div>
-        </div>
-        <div class="cover">
-            {% if bnm['spotify_image'] %}<img src="{{ bnm['spotify_image'] }}" alt="">{% else %}cover unavailable{% endif %}
-        </div>
-    </div>
-</div>
-{% endif %}
-
-<div class="cols three">
-
-<div>
-
-    <div class="panel">
-        <h2>Site</h2>
-        <div class="body" style="font-family: var(--tahoma); font-size: 12px;">
-            <div>Members <b>{{ counts['users'] }}</b></div>
-            <div>Tracks <b>{{ counts['songs'] }}</b></div>
-            <div>Ratings <b>{{ counts['ratings'] }}</b></div>
-        </div>
-    </div>
-
-    <div class="panel">
-        <h2>Recently Seen</h2>
-        <div class="body">
-            <div class="users-grid">
-                {% for u in online_users %}
-                    <a href="{{ url_for('profile', username=u['username']) }}">
-                        <div class="face">{{ u['avatar_emoji'] }}</div>
-                        <div class="name">@{{ u['username'] }}</div>
-                    </a>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-
+<div class="feed-layout">
+  <div class="feed-main">
     {% if current_user %}
-    <div class="panel">
-        <h2>Post Bulletin</h2>
-        <div class="body">
-            <form method="post" action="{{ url_for('post_bulletin') }}">
-                <div class="row"><label>Subject</label><input type="text" name="subject" required></div>
-                <div class="row"><label>Body</label><textarea name="body" placeholder="thoughts. greentext welcome." required></textarea></div>
-                <button type="submit">Post</button>
-            </form>
-        </div>
-    </div>
+      {% include "partials/compose_box.html" %}
     {% endif %}
 
+    <div class="feed-timeline">
+      {% for item in feed_items %}
+        {% include "partials/feed_item.html" %}
+      {% endfor %}
+      {% if feed_items|length == 20 %}
+      <div hx-get="{{ url_for('feed.feed_more', offset=20) }}"
+           hx-trigger="revealed"
+           hx-swap="afterend">
+      </div>
+      {% endif %}
+    </div>
+
+    {% if not feed_items %}
+    <div class="win-panel">
+      <p>No posts yet. Be the first to post!</p>
+    </div>
+    {% endif %}
+  </div>
 </div>
-
-<div>
-
-    <div class="panel flat">
-        <h2>The Chart</h2>
-        <div class="body" style="padding-left:0; padding-right:0;">
-        <table class="songlist">
-            <thead><tr>
-                <th>#</th><th>Track</th><th>Score</th><th>Votes</th><th>Picked by</th>
-            </tr></thead>
-            <tbody>
-            {% for s in top_songs %}
-                <tr>
-                    <td><span class="num">{{ loop.index }}</span></td>
-                    <td>
-                        <div><a href="{{ url_for('song_detail', song_id=s['id']) }}" style="font-weight:600;">{{ s['title'] }}</a></div>
-                        <div style="color:#555; font-size:12px;">{{ s['artist'] }}{% if s['year'] %} · {{ s['year'] }}{% endif %}</div>
-                    </td>
-                    <td><span class="score sm">{{ s['avg_stars']|score10 }}</span></td>
-                    <td style="font-family:var(--tahoma);">{{ s['rating_count'] }}</td>
-                    <td style="font-family:var(--tahoma); font-size:12px;"><a href="{{ url_for('profile', username=s['submitter']) }}">@{{ s['submitter'] }}</a></td>
-                </tr>
-            {% else %}
-                <tr><td colspan="5">No tracks yet — try a trending pick above.</td></tr>
-            {% endfor %}
-            </tbody>
-        </table>
-        </div>
-    </div>
-
-    <div class="panel flat">
-        <h2>New Tracks</h2>
-        <div class="body" style="padding-left:0; padding-right:0;">
-            {% for s in fresh_songs %}
-                <div style="padding:8px 0; border-bottom:1px dotted #999;">
-                    <div><a href="{{ url_for('song_detail', song_id=s['id']) }}" style="font-weight:600;">{{ s['title'] }}</a> — <span style="color:#555;">{{ s['artist'] }}</span>{% if s['year'] %} <span class="kicker">· {{ s['year'] }}</span>{% endif %}</div>
-                    <div class="song-meta">picked by <a href="{{ url_for('profile', username=s['submitter']) }}">@{{ s['submitter'] }}</a> · {{ s['created_at']|datefmt }}</div>
-                </div>
-            {% else %}<div>nothing yet.</div>{% endfor %}
-        </div>
-    </div>
-
-</div>
-
-<div>
-
-    <div class="panel">
-        <h2>🔎 Music Search</h2>
-        <div class="body">
-            {% if spotify_enabled %}
-            <div class="sp-widget">
-                <div class="sp-search">
-                    <input type="text" class="sp-q" placeholder="search tracks &amp; albums…">
-                    <button class="sp-go">Search</button>
-                </div>
-                <div class="sp-results"></div>
-                <div style="margin-top:8px; font: 11px var(--tahoma); color:#555;">
-                    Click a result to open and rate it on Pacer.
-                </div>
-            </div>
-            {% else %}
-            <div class="sp-disabled">
-                Music search isn't configured. Admin: set <code>SPOTIFY_CLIENT_ID</code> and <code>SPOTIFY_CLIENT_SECRET</code>.
-            </div>
-            {% endif %}
-        </div>
-    </div>
-
-    <div class="panel">
-        <h2>📝 Blog Threads</h2>
-        <div class="body">
-            {% for t in recent_threads %}
-                <div class="thread-mini">
-                    <div class="subj"><a href="{{ url_for('blog_thread', thread_id=t['id']) }}">{{ t['subject'] }}</a></div>
-                    <div class="by">@{{ t['username'] }} · <b>{{ t['reply_count'] }}</b> repl{{ 'y' if t['reply_count'] == 1 else 'ies' }} · {{ t['last_activity']|datefmt }}</div>
-                </div>
-            {% else %}
-                <em style="font: 12px var(--tahoma);">No threads yet. <a href="{{ url_for('blog_list') }}">Start one →</a></em>
-            {% endfor %}
-            <div style="margin-top:8px;">
-                <a class="btn" href="{{ url_for('blog_list') }}">All Threads →</a>
-                {% if current_user %}<a class="btn" href="{{ url_for('blog_list') }}#new">+ New Thread</a>{% endif %}
-            </div>
-        </div>
-    </div>
-
-    <div class="panel">
-        <h2>/board/ — Bulletins</h2>
-        <div class="body">
-            {% for b in bulletins %}
-                <div class="post">
-                    <div class="meta">
-                        <span class="who">@{{ b['username'] }}</span>
-                        <span>{{ b['created_at']|datefmt }}</span>
-                        <span class="no">No.{{ '%07d'|format(b['id'] * 1337) }}</span>
-                    </div>
-                    <div class="body"><span class="subj">{{ b['subject'] }}</span></div>
-                    <div class="body">{{ b['body']|greentext }}</div>
-                </div>
-            {% else %}<div>no posts.</div>{% endfor %}
-        </div>
-    </div>
-
-</div>
-
-</div>
-
 {% endblock %}

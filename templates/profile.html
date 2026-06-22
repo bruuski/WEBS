@@ -2,14 +2,21 @@
 {% block title %}@{{ user['username'] }} — Pacer{% endblock %}
 {% block content %}
 
-<div class="profile-head">
+<div class="profile-head{% if user['background_preset'] %} bg-{{ user['background_preset'] }}{% endif %}"{% if user['background_cid'] %} style="background-image: url('{{ ipfs_url(user['background_cid']) }}'); background-size: cover; background-position: center;"{% endif %}>
     <div class="titlebar"><span>@{{ user['username'] }} — Profile</span></div>
     <div class="inner">
-        <div class="avatar">{{ user['avatar_emoji'] }}</div>
+        <div class="avatar">
+            {% if user['profile_pic_cid'] %}
+                <img src="{{ ipfs_url(user['profile_pic_cid']) }}" alt="@{{ user['username'] }}" class="avatar-img">
+            {% else %}
+                {{ user['avatar_emoji'] }}
+            {% endif %}
+        </div>
         <div>
             <div class="handle">@{{ user['username'] }}</div>
             <div class="display-name">{{ user['display_name'] or user['username'] }}</div>
-            {% if user['headline'] %}<div class="headline">“{{ user['headline'] }}”</div>{% endif %}
+            {% if user['headline'] %}<div class="headline">"{{ user['headline'] }}"</div>{% endif %}
+            {% if user['status_message'] %}<div class="status-message">{{ user['status_message'] }}</div>{% endif %}
             <div class="meta-grid">
                 <div><b>Mood</b>{{ user['mood'] or '—' }}</div>
                 <div><b>Age</b>{{ user['age'] or '—' }}</div>
@@ -20,9 +27,12 @@
                     {% if avg_given %}<b>{{ '%.1f'|format(avg_given*2) }}/10</b>{% else %}—{% endif %}
                 </div>
             </div>
+            {% if user['about_me'] %}
+            <div class="profile-about">{{ user['about_me']|greentext }}</div>
+            {% endif %}
             {% if current_user and current_user['id'] == user['id'] %}
                 <div style="margin-top:10px;">
-                    <a class="btn" href="{{ url_for('edit_profile') }}">Edit Profile</a>
+                    <a class="btn" href="{{ url_for('profile.edit_profile') }}">Edit Profile</a>
                 </div>
             {% endif %}
         </div>
@@ -32,117 +42,66 @@
 <div class="cols three">
 
 <div>
+    {% if pinned_songs %}
+    <div class="panel">
+        <h2>Pinned Songs</h2>
+        <div class="body">
+            {% for s in pinned_songs %}
+            <div style="padding:4px 0; border-bottom:1px dotted var(--line);">
+                <a href="{{ url_for('music.song_detail', song_id=s['id']) }}" style="font-weight:600;">{{ s['title'] }}</a>
+                <span style="color:var(--muted); font-size:12px;">{{ s['artist'] }}</span>
+                {% if s['spotify_id'] %}
+                <button class="btn-play-mini" onclick="playInMini('{{ s['spotify_id'] }}', '{{ s['title']|e }}', '{{ s['artist']|e }}')">&#9654;</button>
+                {% endif %}
+                {% if current_user and current_user['id'] == user['id'] %}
+                <form method="post" action="{{ url_for('profile.unpin_song', song_id=s['id']) }}" style="display:inline;">
+                    <button type="submit" class="ghost" style="font-size:11px;">unpin</button>
+                </form>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if playlists %}
+    <div class="panel">
+        <h2>Playlists</h2>
+        <div class="body">
+            {% for p in playlists %}
+            <div style="padding:4px 0; border-bottom:1px dotted var(--line);">
+                <a href="{{ url_for('profile.view_playlist', playlist_id=p['id']) }}" style="font-weight:600;">{{ p['name'] }}</a>
+                <span style="color:var(--muted); font-size:12px;">{{ p['track_count'] }} tracks</span>
+            </div>
+            {% endfor %}
+            {% if current_user and current_user['id'] == user['id'] %}
+            <div style="margin-top:8px;">
+                <a class="btn ghost" href="{{ url_for('profile.new_playlist') }}">+ New Playlist</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% elif current_user and current_user['id'] == user['id'] %}
+    <div class="panel">
+        <h2>Playlists</h2>
+        <div class="body">
+            <em>No playlists yet.</em>
+            <div style="margin-top:8px;">
+                <a class="btn ghost" href="{{ url_for('profile.new_playlist') }}">+ New Playlist</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="panel">
         <h2>Interests</h2>
         <div class="body" style="font-size: 13px;">
             <div style="margin-bottom:8px;"><b style="font-family:var(--mono); font-size:11px; text-transform:uppercase; color:var(--muted);">Artists</b><br>{{ user['fav_bands'] or '—' }}</div>
         </div>
     </div>
-
-    <div class="panel">
-        <h2>Spotify</h2>
-        <div class="body">
-            {% if not spotify_enabled %}
-                <div class="sp-disabled">Spotify is not configured on this server.</div>
-            {% elif user['spotify_id'] %}
-                <div style="font-family: var(--mono); font-size: 12px;">
-                    <span class="sp-pill">CONNECTED</span>
-                    <div style="margin-top:6px;">spotify id: <code>{{ user['spotify_id'] }}</code></div>
-                </div>
-                {% if current_user and current_user['id'] == user['id'] %}
-                    <form method="post" action="{{ url_for('spotify_disconnect') }}" style="margin-top:10px;">
-                        <button type="submit" class="ghost">Disconnect</button>
-                    </form>
-                    <div id="sp-top" style="margin-top:10px;"></div>
-                    <script>
-                    fetch('/me/spotify/top').then(r=>r.json()).then(d=>{
-                        var box = document.getElementById('sp-top');
-                        if (!d.items || !d.items.length) { box.innerHTML = '<div class="sp-disabled" style="font-size:11px;">No top tracks yet (or token expired).</div>'; return; }
-                        var html = '<div class="kicker" style="margin-bottom:6px;">Your top tracks (last 4 wks)</div>';
-                        d.items.slice(0, 8).forEach(function (t) {
-                            html += '<div style="font-family:var(--mono); font-size:11px; padding:3px 0; border-bottom:1px dotted var(--line);">'+
-                                '<a href="'+t.url+'" target="_blank" rel="noopener">'+
-                                (t.name || '')+'</a> — <span style="color:var(--muted);">'+(t.artists||'')+'</span></div>';
-                        });
-                        box.innerHTML = html;
-                    });
-                    </script>
-                {% endif %}
-            {% else %}
-                {% if current_user and current_user['id'] == user['id'] %}
-                    <p style="font-family: var(--mono); font-size: 12px;">Link your Spotify account to show your top tracks here.</p>
-                    <a class="btn spotify" href="{{ url_for('spotify_connect') }}">Connect Spotify</a>
-                {% else %}
-                    <div class="sp-disabled">@{{ user['username'] }} hasn't linked Spotify.</div>
-                {% endif %}
-            {% endif %}
-        </div>
-    </div>
-
-    <div class="panel">
-        <h2>Discover</h2>
-        <div class="body">
-            <div class="users-grid">
-                {% for f in top_friends %}
-                    <a href="{{ url_for('profile', username=f['username']) }}">
-                        <div class="face">{{ f['avatar_emoji'] }}</div>
-                        <div class="name">@{{ f['username'] }}</div>
-                    </a>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
 </div>
 
 <div>
-    <div class="panel">
-        <h2>About</h2>
-        <div class="body editorial" style="font-size:16px;">
-            {% if user['about_me'] %}{{ user['about_me']|greentext }}{% else %}<em>No bio yet.</em>{% endif %}
-        </div>
-    </div>
-
-    <div class="panel flat">
-        <h2>Submitted Tracks</h2>
-        <div class="body" style="padding-left:0; padding-right:0;">
-            {% if submitted %}
-            <table class="songlist">
-                <thead><tr><th>Track</th><th>Score</th><th>Votes</th></tr></thead>
-                <tbody>
-                {% for s in submitted %}
-                  <tr>
-                    <td>
-                        <div><a href="{{ url_for('song_detail', song_id=s['id']) }}" style="font-weight:600;">{{ s['title'] }}</a></div>
-                        <div style="color:var(--muted); font-size:12px;">{{ s['artist'] }}</div>
-                    </td>
-                    <td><span class="score sm">{{ s['avg_stars']|score10 }}</span></td>
-                    <td style="font-family:var(--mono);">{{ s['rating_count'] }}</td>
-                  </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-            {% else %}<em>None.</em>{% endif %}
-        </div>
-    </div>
-
-    <div class="panel flat">
-        <h2>Recent Ratings</h2>
-        <div class="body" style="padding-left:0; padding-right:0;">
-            {% if ratings %}
-            {% for r in ratings %}
-                <div style="padding:8px 0; border-bottom:1px dotted var(--line);">
-                    <div style="display:flex; gap:10px; align-items:baseline;">
-                        <span class="score sm">{{ r['stars']|score10 }}</span>
-                        <span><a href="{{ url_for('song_detail', song_id=r['song_id']) }}" style="font-weight:600;">{{ r['title'] }}</a> — <span style="color:var(--muted);">{{ r['artist'] }}</span></span>
-                    </div>
-                    {% if r['review'] %}<div style="font-family:var(--mono); font-size:12px; margin-top:4px;">{{ r['review']|greentext }}</div>{% endif %}
-                    <div class="song-meta">{{ r['created_at']|datefmt }}</div>
-                </div>
-            {% endfor %}
-            {% else %}<em>No ratings yet.</em>{% endif %}
-        </div>
-    </div>
-
     <div class="panel flat" id="comment">
         <h2>Wall ({{ comments|length }})</h2>
         <div class="body">
@@ -152,7 +111,7 @@
                 <button type="submit" style="margin-top:6px;">Reply</button>
             </form>
             {% else %}
-                <p style="font-family: var(--mono); font-size: 12px;"><a href="{{ url_for('login') }}">Log in</a> to post.</p>
+                <p style="font-family: var(--mono); font-size: 12px;"><a href="{{ url_for('auth.login') }}">Log in</a> to post.</p>
             {% endif %}
             {% for c in comments %}
                 <div class="post">
@@ -166,6 +125,17 @@
             {% else %}<em>No replies yet.</em>{% endfor %}
         </div>
     </div>
+
+    {% if user_feed %}
+    <div class="panel flat">
+        <h2>Posts</h2>
+        <div class="body" style="padding-left:0; padding-right:0;">
+            {% for item in user_feed %}
+                {% include "partials/feed_item.html" %}
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <div>
@@ -182,6 +152,24 @@
             <div>Ratings <b>{{ ratings|length }}</b></div>
             <div>Submitted <b>{{ submitted|length }}</b></div>
             <div>Replies on wall <b>{{ comments|length }}</b></div>
+        </div>
+    </div>
+
+    <div class="panel flat profile-ratings-desktop">
+        <h2>Recent Ratings</h2>
+        <div class="body" style="padding-left:0; padding-right:0;">
+            {% if ratings %}
+            {% for r in ratings %}
+                <div style="padding:8px 0; border-bottom:1px dotted var(--line);">
+                    <div style="display:flex; gap:10px; align-items:baseline;">
+                        <span class="score sm">{{ r['stars']|score10 }}</span>
+                        <span><a href="{{ url_for('music.song_detail', song_id=r['song_id']) }}" style="font-weight:600;">{{ r['title'] }}</a> — <span style="color:var(--muted);">{{ r['artist'] }}</span></span>
+                    </div>
+                    {% if r['review'] %}<div style="font-family:var(--mono); font-size:12px; margin-top:4px;">{{ r['review']|greentext }}</div>{% endif %}
+                    <div class="song-meta">{{ r['created_at']|datefmt }}</div>
+                </div>
+            {% endfor %}
+            {% else %}<em>No ratings yet.</em>{% endif %}
         </div>
     </div>
 
