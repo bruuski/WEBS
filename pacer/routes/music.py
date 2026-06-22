@@ -18,9 +18,17 @@ from flask import (
 from pacer.config import DB_PATH as _DB_PATH
 from pacer.db import get_db
 from pacer.helpers import current_user, login_required
-from pacer.services import discogs
+from pacer.services import discogs  # no-op shim, kept for legacy guards
 from pacer.services.feed import create_activity
-from pacer.services.spotify import lookup_spotify_preview
+from pacer.services.spotify import (
+    get_album as sp_get_album,
+    get_artist as sp_get_artist,
+    get_artist_albums as sp_get_artist_albums,
+    get_artist_top_tracks as sp_get_artist_top_tracks,
+    get_track as sp_get_track,
+    lookup_spotify_preview,
+    spotify_configured,
+)
 
 def find_or_create_song_from_spotify(spotify_meta: dict) -> dict | None:
     """Persist a Spotify trending/search result as a local songs row.
@@ -556,52 +564,121 @@ def album_detail(album_id):
 
 @bp.route("/track/spotify/<ref>")
 def track_from_spotify(ref):
-    """Resolve a track reference (Spotify ID or Discogs release ID) to a local song page.
-
-    The path is kept as /track/spotify/ for backward compatibility, but the
-    value can now be a Discogs release ID (numeric). We detect by checking
-    if the value is all-digits (Discogs) vs alphanumeric (Spotify).
-    """
-    if ref.isdigit():
-        # Discogs ID
-        if not discogs.discogs_configured():
-            flash("Discogs not configured.", "warn")
-            return redirect(url_for("music.browse"))
-        release = discogs.get_release(int(ref))
-        if not release or not release.get("tracklist"):
-            flash("Couldn't find that track on Discogs.", "warn")
-            return redirect(url_for("music.browse"))
-        # Use first track to create the song
-        first = release["tracklist"][0]
-        artists = ", ".join(release.get("artists", []))
-        song_id = _create_song_from_discogs_release(release, first, artists)
-        if not song_id:
-            flash("Couldn't create song record.", "warn")
-            return redirect(url_for("music.browse"))
-        return redirect(url_for("music.song_detail", song_id=song_id))
-
-    # Legacy Spotify ID — no longer supported, redirect to browse
-    flash("Spotify deep links are no longer supported.", "warn")
-    return redirect(url_for("music.browse"))
+    """Resolve a Spotify track ID to a local song page, creating the row if needed."""
+    if not spotify_configured():
+        flash("Spotify isn't configured on this server.", "warn")
+        return redirect(url_for("music.browse"))
+    track = sp_get_track(ref)
+    if not track:
+        flash("Couldn't look up that track on Spotify.", "warn")
+        return redirect(url_for("music.browse"))
+    song_row = find_or_create_song_from_spotify({
+        "id":      track["spotify_id"],
+        "name":    track["name"],
+        "artists": track["artists"],
+        "image":   track["image_lg"] or track["image"],
+        "url":     track["url"],
+    })
+    if not song_row:
+        flash("Couldn't create song record.", "warn")
+        return redirect(url_for("music.browse"))
+    # Also populate album/year/spotify_artist_id and link to artist row
+    db = get_db()
+    artist_local_id = None
+    if track.get("spotify_artist_id"):
+        artist_local_id = _find_or_create_artist_from_spotify(track["spotify_artist_id"])
+    db.execute(
+        """UPDATE songs SET
+              album               = COALESCE(NULLIF(album,''), ?),
+              year                = COALESCE(year, ?),
+              spotify_artist_id   = COALESCE(NULLIF(spotify_artist_id,''), ?),
+              spotify_preview_url = COALESCE(NULLIF(spotify_preview_url,''), ?),
+              artist_id           = COALESCE(artist_id, ?)
+           WHERE id = ?""",
+        (
+            track.get("album_name"),
+            int(track["year"]) if track.get("year") and track["year"].isdigit() else None,
+            track.get("spotify_artist_id"),
+            track.get("preview_url"),
+            artist_local_id,
+            song_row["id"],
+        ),
+    )
+    db.commit()
+    return redirect(url_for("music.song_detail", song_id=song_row["id"]))
 
 
 @bp.route("/album/spotify/<ref>")
 def album_from_spotify(ref):
-    """Resolve an album reference (Spotify ID or Discogs ID) to a local album page."""
-    if ref.isdigit():
-        # Discogs ID
-        if not discogs.discogs_configured():
-            flash("Discogs not configured.", "warn")
-            return redirect(url_for("music.browse"))
-        album_id = _find_or_create_album_from_discogs(int(ref))
-        if not album_id:
-            flash("Couldn't look up that album on Discogs.", "warn")
-            return redirect(url_for("music.browse"))
-        return redirect(url_for("music.album_detail", album_id=album_id))
+    """Resolve a Spotify album ID to a local album page, creating the row if needed."""
+    if not spotify_configured():
+        flash("Spotify isn't configured on this server.", "warn")
+        return redirect(url_for("music.browse"))
+    db = get_db()
+    existing = db.execute(
+        "SELECT id FROM albums WHERE spotify_id = ?", (ref,)
+    ).fetchone()
+    if existing:
+        return redirect(url_for("music.album_detail", album_id=existing["id"]))
+    album = sp_get_album(ref)
+    if not album:
+        flash("Couldn't look up that album on Spotify.", "warn")
+        return redirect(url_for("music.browse"))
+    submitter = db.execute("SELECT id FROM users ORDER BY id ASC LIMIT 1").fetchone()
+    if not submitter:
+        flash("No users in the database yet.", "warn")
+        return redirect(url_for("music.browse"))
+    year = int(album["year"]) if album.get("year") and album["year"].isdigit() else None
+    cur = db.execute(
+        """INSERT INTO albums
+           (name, artist, year, created_at, submitted_by,
+            spotify_id, spotify_url, spotify_image,
+            spotify_artist_id, format, cover_image)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+        (album["name"][:200], album["artist"][:120], year,
+         datetime.utcnow().isoformat(timespec="seconds"),
+         submitter["id"],
+         album["spotify_id"], album["url"], album["image_lg"] or album["image"],
+         album.get("spotify_artist_id"), album.get("format"),
+         album["image_lg"] or album["image"]),
+    )
+    album_id = cur.lastrowid
+    # Link to artist row (create if missing)
+    if album.get("spotify_artist_id"):
+        artist_id = _find_or_create_artist_from_spotify(album["spotify_artist_id"])
+        if artist_id:
+            db.execute("UPDATE albums SET artist_id = ? WHERE id = ?", (artist_id, album_id))
+    db.commit()
+    return redirect(url_for("music.album_detail", album_id=album_id))
 
-    # Legacy Spotify ID — no longer supported, redirect to browse
-    flash("Spotify deep links are no longer supported.", "warn")
-    return redirect(url_for("music.browse"))
+
+def _find_or_create_artist_from_spotify(spotify_id: str):
+    """Find or create the local artists row for a Spotify artist ID."""
+    if not spotify_id:
+        return None
+    db = get_db()
+    row = db.execute("SELECT id FROM artists WHERE spotify_id = ?", (spotify_id,)).fetchone()
+    if row:
+        return row["id"]
+    artist = sp_get_artist(spotify_id)
+    if not artist:
+        return None
+    try:
+        cur = db.execute(
+            """INSERT INTO artists (spotify_id, name, image_url, genres,
+                                    popularity, spotify_url)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (artist["spotify_id"], artist["name"][:120],
+             artist.get("image_url"),
+             ", ".join(artist.get("genres") or [])[:200],
+             artist.get("popularity") or 0,
+             artist.get("spotify_url")),
+        )
+        db.commit()
+        return cur.lastrowid
+    except _sqlite3.IntegrityError:
+        row = db.execute("SELECT id FROM artists WHERE spotify_id = ?", (spotify_id,)).fetchone()
+        return row["id"] if row else None
 
 
 @bp.route("/artists/<int:artist_id>")
@@ -654,22 +731,71 @@ def artist_detail(artist_id):
         WHERE a.artist_id = ?
     """, (artist_id,)).fetchone()
 
-    # Top tracks + albums from DB (avoid extra Discogs calls; Spotify is gone)
-    top_tracks = db.execute("""
+    # Top tracks + albums: pull from Spotify when we have a spotify_id;
+    # fall back to DB-only otherwise. Both Spotify calls are TTL-cached so
+    # repeated views of this page don't re-fetch.
+    sp_id = artist["spotify_id"] if artist["spotify_id"] and not (artist["spotify_id"] or "").startswith("discogs") else None
+
+    top_tracks_rows = db.execute("""
         SELECT s.id, s.title, s.album, s.year, s.spotify_id, s.spotify_image,
                COALESCE(AVG(r.stars), 0) as avg_stars, COUNT(r.id) as rating_count
         FROM songs s LEFT JOIN ratings r ON r.song_id = s.id
         WHERE s.artist_id = ?
-        GROUP BY s.id ORDER BY avg_stars DESC LIMIT 5
+        GROUP BY s.id ORDER BY avg_stars DESC LIMIT 10
     """, (artist_id,)).fetchall()
 
-    albums = db.execute("""
+    top_tracks = []
+    if sp_id:
+        sp_top = sp_get_artist_top_tracks(sp_id)
+        # Template expects: spotify_id, name, album_name, duration_ms
+        for t in sp_top:
+            top_tracks.append({
+                "spotify_id":  t["spotify_id"],
+                "name":        t["name"],
+                "album_name":  t["album_name"] or "",
+                "duration_ms": t["duration_ms"],
+            })
+    # Always also expose the locally-rated tracks (which include rating averages)
+    if not top_tracks:
+        for r in top_tracks_rows:
+            top_tracks.append({
+                "spotify_id":  r["spotify_id"] or "",
+                "name":        r["title"],
+                "album_name":  r["album"] or "",
+                "duration_ms": 0,
+            })
+
+    db_albums = db.execute("""
         SELECT id, name, year, format, spotify_id, spotify_image,
                cover_image, discogs_release_id, release_url
         FROM albums
         WHERE artist_id = ?
         ORDER BY year DESC
     """, (artist_id,)).fetchall()
+
+    if sp_id:
+        sp_albums = sp_get_artist_albums(sp_id, limit=24)
+        # Merge: local rows (if any) + Spotify rows. Use Spotify shape that the
+        # template already expects (cover_image / spotify_image / name / year / format).
+        seen = {(r["spotify_id"] or "") for r in db_albums}
+        merged = [dict(r) for r in db_albums]
+        for sa in sp_albums:
+            if sa["spotify_id"] in seen:
+                continue
+            merged.append({
+                "id":                 None,           # not in local DB yet
+                "name":               sa["name"],
+                "year":               int(sa["year"]) if sa["year"] and sa["year"].isdigit() else None,
+                "format":             sa.get("format"),
+                "spotify_id":         sa["spotify_id"],
+                "spotify_image":      sa["image_lg"] or sa["image"],
+                "cover_image":        sa["image_lg"] or sa["image"],
+                "discogs_release_id": None,
+                "release_url":        sa["url"],
+            })
+        albums = merged
+    else:
+        albums = db_albums
 
     return render_template("artist.html",
         artist=artist, artist_info=artist_info,
@@ -681,10 +807,12 @@ def artist_detail(artist_id):
 
 @bp.route("/artist/spotify/<spotify_id>")
 def artist_from_spotify(spotify_id):
-    """Land on a local artist page for a Spotify artist, creating it if needed.
-
-    Spotify metadata lookup removed in Discogs-first refactor. This route is
-    temporarily a no-op redirect; Phase 3 will wire it to Discogs.
-    """
-    flash("Spotify deep links are temporarily unavailable.", "warn")
-    return redirect(url_for("feed.home"))
+    """Resolve a Spotify artist ID to a local artist page, creating the row if needed."""
+    if not spotify_configured():
+        flash("Spotify isn't configured on this server.", "warn")
+        return redirect(url_for("feed.home"))
+    artist_id = _find_or_create_artist_from_spotify(spotify_id)
+    if not artist_id:
+        flash("Couldn't look up that artist on Spotify.", "warn")
+        return redirect(url_for("feed.home"))
+    return redirect(url_for("music.artist_detail", artist_id=artist_id))

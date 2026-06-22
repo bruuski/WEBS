@@ -11,11 +11,10 @@ from flask import Blueprint, flash, jsonify, redirect, render_template, request,
 from pacer.config import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI
 from pacer.db import get_db
 from pacer.helpers import current_user, login_required
-from pacer.services import discogs
 from pacer.services.spotify import (
     get_app_spotify_token,
-    lookup_spotify_preview,
     refresh_user_spotify_token,
+    search_spotify,
     spotify_configured,
 )
 
@@ -32,62 +31,18 @@ def search_page():
 
 @bp.route("/spotify/search")
 def spotify_search():
-    """Music search: Discogs as primary source, Spotify preview as enrichment."""
+    """Music search across Spotify tracks + albums + artists."""
     q = (request.args.get("q") or "").strip()
+    types = (request.args.get("type") or "track,album,artist").strip()
     if not q:
         return jsonify({"items": []})
-    if not discogs.discogs_configured():
+    if not spotify_configured():
         return jsonify({
-            "error": "Music search isn't configured. Set DISCOGS_CONSUMER_KEY and "
-                     "DISCOGS_CONSUMER_SECRET environment variables."
+            "error": "Music search isn't configured. Set SPOTIFY_CLIENT_ID and "
+                     "SPOTIFY_CLIENT_SECRET environment variables."
         }), 503
-
-    results = discogs.search_releases(q, per_page=12)
-    enriched = []
-    for r in results:
-        # Parse "Artist - Album" from title
-        title = r.get("title", "")
-        if " - " in title:
-            artist, _album = title.split(" - ", 1)
-        else:
-            artist, _album = title, ""
-
-        # We already fetch the full release below to grab the first track title
-        # for preview lookup. Reuse it to upgrade the search-thumb (often an
-        # empty string for older releases) to the higher-res cover_image, so
-        # the search result row can show a proportional cover.
-        first_track_title = None
-        cover_image = r.get("thumb") or r.get("cover_image") or ""
-        if r.get("discogs_id"):
-            release = discogs.get_release(r["discogs_id"])
-            if release:
-                if release.get("tracklist"):
-                    first_track_title = release["tracklist"][0].get("title")
-                if release.get("cover_image"):
-                    cover_image = release["cover_image"]
-                elif release.get("thumb"):
-                    cover_image = release["thumb"]
-
-        # Lookup Spotify preview
-        preview = None
-        if first_track_title:
-            preview = lookup_spotify_preview(artist, first_track_title)
-        if not preview:
-            preview = lookup_spotify_preview(artist, title)
-
-        enriched.append({
-            "discogs_id":   r.get("discogs_id"),
-            "title":        title,
-            "year":         r.get("year"),
-            "country":      r.get("country"),
-            "label":        r.get("label"),
-            "format":       r.get("format", []),
-            "thumb":        cover_image,
-            "style":        r.get("style", []),
-            "has_preview":  bool(preview and preview.get("preview_url")),
-            "spotify_id":   preview["spotify_id"] if preview else None,
-        })
-    return jsonify({"items": enriched})
+    items = search_spotify(q, types=types, limit=6)
+    return jsonify({"items": items})
 
 
 @bp.route("/spotify/connect")
