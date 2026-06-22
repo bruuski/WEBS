@@ -1,0 +1,9 @@
+{% for item in feed_items %}
+  {% include "partials/feed_item.html" %}
+{% endfor %}
+{% if feed_items|length == 20 %}
+<div hx-get="{{ url_for('feed.feed_more', offset=offset + 20) }}"
+     hx-trigger="revealed"
+     hx-swap="afterend">
+</div>
+{% endif %}

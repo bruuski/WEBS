@@ -1,0 +1,159 @@
+<div class="feed-item win-panel">
+  <div class="feed-item-header">
+    {% if item["profile_pic_cid"] %}
+    <img src="{{ ipfs_url(item['profile_pic_cid']) }}" alt="" class="feed-avatar-img">
+    {% else %}
+    <span class="feed-avatar">{{ item["avatar_emoji"] or "🎧" }}</span>
+    {% endif %}
+    <a href="{{ url_for('profile.profile', username=item['username']) }}" class="feed-username">
+      {{ item["display_name"] or item["username"] }}
+    </a>
+    <span class="feed-time">{{ item["created_at"]|datefmt }}</span>
+  </div>
+
+  {% if item["item_type"] == "post" %}
+    <div class="feed-item-body">{{ item["body"] }}</div>
+  {% elif item["item_type"] == "activity" %}
+    <div class="feed-item-body feed-activity">
+      {% if item["activity_type"] == "rating" %}
+        rated {{ item["rating_stars"]|stars }}
+      {% elif item["activity_type"] == "review" %}
+        wrote a review
+      {% elif item["activity_type"] == "playlist_create" %}
+        created a new playlist
+        {% if item.get("playlist") %}
+        <a href="{{ url_for('profile.view_playlist', playlist_id=item['playlist']['id']) }}" class="feed-playlist-link">{{ item["playlist"]["name"] }}</a>
+        {% endif %}
+      {% endif %}
+    </div>
+    {% if item.get("playlist") and item.get("playlist_tracks") %}
+    <div class="feed-playlist-card">
+      <div class="feed-playlist-card-title">{{ item["playlist"]["name"] }}</div>
+      <ol class="feed-playlist-tracks">
+        {% for t in item["playlist_tracks"] %}
+        <li>
+          <a href="{{ url_for('music.song_detail', song_id=t['id']) }}">{{ t["title"] }}</a>
+          <span class="feed-playlist-artist">{{ t["artist"] }}</span>
+          {% if t["spotify_id"] %}
+          <button class="btn-play-mini" onclick="playInMini('{{ t['spotify_id'] }}', '{{ t['title']|e }}', '{{ t['artist']|e }}')">&#9654;</button>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ol>
+    </div>
+    {% endif %}
+  {% elif item["item_type"] == "repost" %}
+    <div class="feed-item-body feed-repost">&#128257; reposted</div>
+  {% endif %}
+
+  {% if item.get("image_cid") %}
+  <div class="feed-image">
+    <img src="{{ ipfs_url(item['image_cid']) }}" alt="" class="feed-image-img">
+  </div>
+  {% endif %}
+
+  {% if item.get("song") %}
+  <div class="feed-attachment">
+    <a href="{{ url_for('music.song_detail', song_id=item['song']['id']) }}" class="feed-song-card">
+      {% if item["song"]["spotify_image"] %}
+      <img src="{{ item['song']['spotify_image'] }}" alt="" class="feed-song-img">
+      {% endif %}
+      <div class="feed-song-info">
+        <div class="feed-song-title">{{ item["song"]["title"] }}</div>
+        <div class="feed-song-artist">{{ item["song"]["artist"] }}</div>
+      </div>
+    </a>
+  </div>
+  {% endif %}
+
+  {% if item.get("album") %}
+  <div class="feed-attachment">
+    <a href="{{ url_for('music.album_detail', album_id=item['album']['id']) }}" class="feed-song-card">
+      {% if item["album"]["spotify_image"] %}
+      <img src="{{ item['album']['spotify_image'] }}" alt="" class="feed-song-img">
+      {% endif %}
+      <div class="feed-song-info">
+        <div class="feed-song-title">{{ item["album"]["name"] }}</div>
+        <div class="feed-song-artist">{{ item["album"]["artist"] }}</div>
+      </div>
+    </a>
+  </div>
+  {% endif %}
+
+  <div class="feed-item-actions">
+    {% if item["item_type"] in ("post", "activity") %}
+    {% if item["user_liked"] %}
+    <button class="btn-action btn-liked"
+            hx-post="{{ url_for('feed.unlike_' + item['item_type'], **{item['item_type'] + '_id': item['id']}) }}"
+            hx-target="this"
+            hx-swap="outerHTML"
+            hx-boost="false"
+            hx-select="unset">
+      &#9829; {{ item["like_count"] }}
+    </button>
+    {% else %}
+    <button class="btn-action"
+            hx-post="{{ url_for('feed.like_' + item['item_type'], **{item['item_type'] + '_id': item['id']}) }}"
+            hx-target="this"
+            hx-swap="outerHTML"
+            hx-boost="false"
+            hx-select="unset">
+      &#9825; {{ item["like_count"] }}
+    </button>
+    {% endif %}
+    <button class="btn-action" onclick="toggleReply('{{ item['item_type'] }}-{{ item['id'] }}')">&#128172; {{ item["reply_count"] }}</button>
+    <button class="btn-action {% if item.get('user_reposted') %}btn-reposted{% endif %}"
+            {% if item.get('user_reposted') %}
+            hx-post="{{ url_for('feed.unrepost_' + item['item_type'], **{item['item_type'] + '_id': item['id']}) }}"
+            {% else %}
+            hx-post="{{ url_for('feed.repost_' + item['item_type'], **{item['item_type'] + '_id': item['id']}) }}"
+            {% endif %}
+            hx-target="this"
+            hx-swap="outerHTML"
+            hx-boost="false"
+            hx-select="unset">
+      &#128257; {{ item["repost_count"] }}
+    </button>
+    {% endif %}
+  </div>
+
+  <!-- Reply Section -->
+  {% if item["item_type"] in ("post", "activity") %}
+  <div class="reply-section" id="reply-{{ item['item_type'] }}-{{ item['id'] }}" style="display:none;">
+    <div class="replies-list" id="replies-{{ item['item_type'] }}-{{ item['id'] }}">
+    </div>
+    {% if current_user %}
+    <form class="reply-form"
+          hx-post="{{ url_for('feed.reply_' + item['item_type'], **{item['item_type'] + '_id': item['id']}) }}"
+          hx-target="#replies-{{ item['item_type'] }}-{{ item['id'] }}"
+          hx-swap="beforeend"
+          hx-boost="false"
+          hx-select="unset"
+          hx-on::after-request="this.reset(); clearReplyAttachments('{{ item['item_type'] }}-{{ item['id'] }}')">
+      <textarea name="body" placeholder="Write a reply..." maxlength="280" required class="reply-input" rows="2"></textarea>
+      <div class="reply-actions">
+        <div class="reply-buttons">
+          <button type="button" onclick="toggleReplyAttachMenu('{{ item['item_type'] }}-{{ item['id'] }}')" class="btn-small" title="Attach">&#128206;</button>
+        </div>
+        <button type="submit" class="btn-small">Reply</button>
+      </div>
+      <input type="file" id="reply-image-file-{{ item['item_type'] }}-{{ item['id'] }}" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none" onchange="uploadReplyImage(this, '{{ item['item_type'] }}-{{ item['id'] }}')">
+      <input type="hidden" name="image_cid" id="reply-image-cid-{{ item['item_type'] }}-{{ item['id'] }}" value="">
+      <input type="hidden" name="song_id" id="reply-song-id-{{ item['item_type'] }}-{{ item['id'] }}" value="">
+    </form>
+    <div id="reply-attach-menu-{{ item['item_type'] }}-{{ item['id'] }}" class="reply-attach-menu" style="display:none;">
+      <button type="button" onclick="triggerReplyImage('{{ item['item_type'] }}-{{ item['id'] }}')" class="btn-small">🖼 Image</button>
+      <button type="button" onclick="toggleReplySongSearch('{{ item['item_type'] }}-{{ item['id'] }}')" class="btn-small">🎵 Song</button>
+    </div>
+    <div id="reply-song-search-{{ item['item_type'] }}-{{ item['id'] }}" class="reply-song-search" style="display:none;">
+      <input type="text" placeholder="Search song..." class="reply-input" oninput="searchReplySong(this.value, '{{ item['item_type'] }}-{{ item['id'] }}')">
+      <div id="reply-song-results-{{ item['item_type'] }}-{{ item['id'] }}" class="reply-song-results"></div>
+    </div>
+    <div id="reply-attachment-preview-{{ item['item_type'] }}-{{ item['id'] }}" class="reply-attachment-preview" style="display:none;">
+      <span id="reply-attachment-text-{{ item['item_type'] }}-{{ item['id'] }}"></span>
+      <button type="button" onclick="clearReplyAttachments('{{ item['item_type'] }}-{{ item['id'] }}')" class="btn-small">✕</button>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>

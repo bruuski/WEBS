@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% block title %}{{ album['name'] }} — {{ album['artist'] }} — Album — Pacer{% endblock %}
+{% block content %}
+
+<div class="feature">
+    <div class="titlebar"><span>{{ album['name'] }} — {{ album['artist'] }} (Album)</span></div>
+    <div class="inner">
+        <div>
+            {% if stats['avg_stars'] and stats['avg_stars'] >= 4 %}
+                <div class="bnm">★ Highly Rated Album</div>
+            {% endif %}
+            <div class="kicker">Album {% if album['year'] %}· {{ album['year'] }}{% endif %}</div>
+            <div class="song-title">{{ album['name'] }}</div>
+            <div class="song-artist">
+              {% if artist and artist['id'] %}
+                <a href="{{ url_for('music.artist_detail', artist_id=artist['id']) }}">{{ album["artist"] }}</a>
+              {% else %}
+                {{ album["artist"] }}
+              {% endif %}
+            </div>
+            <div class="song-meta">
+                added {{ album['created_at']|datefmt }}
+                {% if album['spotify_url'] %} · <a href="{{ album['spotify_url'] }}" target="_blank" rel="noopener">listen ↗</a>{% endif %}
+            </div>
+            <div style="margin-top:18px; display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap;">
+                <div class="score">{{ stats['avg_stars']|score10 }}<span class="max">/10</span></div>
+                <div>
+                    <div class="stars">{{ stats['avg_stars']|stars }}</div>
+                    <div class="song-meta">{{ stats['n'] }} rating{{ '' if stats['n']==1 else 's' }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="cover">
+            {% if album['spotify_image'] %}<img src="{{ album['spotify_image'] }}" alt="cover">{% else %}no cover{% endif %}
+        </div>
+    </div>
+</div>
+
+{% if album["spotify_id"] %}
+<div class="spotify-embed">
+  <iframe
+    src="https://open.spotify.com/embed/album/{{ album['spotify_id'] }}?theme=0"
+    width="100%" height="352" frameborder="0"
+    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+    loading="lazy">
+  </iframe>
+</div>
+{% endif %}
+
+{% if featured %}
+<div class="featured-review">
+    <div class="who">Featured review · <a href="{{ url_for('profile.profile', username=featured['username']) }}">@{{ featured['username'] }}</a> · <span class="stars">{{ featured['stars']|stars }}</span></div>
+    {{ featured['review']|greentext }}
+</div>
+{% endif %}
+
+<div class="cols two">
+
+<div>
+    <div class="panel">
+    <h2>{% if my_rating %}Update Your Rating{% else %}Rate this album{% endif %}</h2>
+    <div class="body">
+        {% if current_user %}
+        <form method="post">
+            <div class="row">
+                <label><b>Rating</b></label>
+                <div class="star-rating-widget">
+                    <div class="stars-input">
+                    {% set values = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5] %}
+                    {% for v in values %}
+                    <button type="button" class="star-btn {% if my_rating and my_rating['stars'] == v %}active{% endif %}" onclick="setRating({{ v }})">
+                      {{ v }}★
+                    </button>
+                    {% endfor %}
+                    </div>
+                    <input type="hidden" name="stars" id="stars-value" value="{{ my_rating['stars'] if my_rating else '' }}">
+                    <div id="rating-preview" class="rating-preview">{% if my_rating %}{{ (my_rating['stars'] * 2)|round(1) }}/10{% endif %}</div>
+                </div>
+            </div>
+            <div class="row">
+                <label>Review (optional)</label>
+                <textarea name="review" placeholder="what do you think? greentext fine.">{{ my_rating['review'] if my_rating else '' }}</textarea>
+            </div>
+            <button type="submit">{{ 'Update Rating' if my_rating else 'Submit Rating' }}</button>
+        </form>
+        {% else %}
+            <p style="font: 12px var(--tahoma);"><a href="{{ url_for('auth.login', next=request.path) }}">Log in</a> or <a href="{{ url_for('auth.signup') }}">sign up</a> to rate.</p>
+        {% endif %}
+    </div>
+    </div>
+
+    {% if catalog %}
+    <div class="panel">
+        <h3>Tracklist</h3>
+        <div class="body" style="padding:0;">
+            <table class="songlist">
+                <thead><tr><th style="width:32px;">#</th><th>Title</th><th>Length</th></tr></thead>
+                <tbody>
+                {% for t in catalog.tracklist %}
+                    <tr>
+                        <td><span class="num">{{ t.position }}</span></td>
+                        <td style="font-weight:600;">{{ t.title }}</td>
+                        <td style="font-family: var(--tahoma); font-size:12px; color:#444;">{{ t.duration or '' }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="body" style="font-family: var(--tahoma); font-size:12px; color:#666;">
+            Label: <strong>{{ catalog.label or '—' }}</strong> ·
+            Format: <strong>{{ catalog.format|join(', ') or '—' }}</strong> ·
+            {{ catalog.year or '—' }} · {{ catalog.country or '—' }}
+            {% if catalog.release_url %}
+            · <a href="{{ catalog.release_url }}" target="_blank" rel="noopener" class="ext-link">View on catalog ↗</a>
+            {% endif %}
+        </div>
+    </div>
+    {% elif tracks %}
+    <div class="panel">
+        <h2>Tracklist ({{ tracks|length }})</h2>
+        <div class="body" style="padding:0;">
+            <table class="songlist">
+                <thead><tr><th style="width:32px;">#</th><th>Title</th><th>Length</th></tr></thead>
+                <tbody>
+                {% for t in tracks %}
+                    <tr>
+                        <td><span class="num">{{ t['track_number'] }}</span></td>
+                        <td>
+                            <a href="{{ url_for('music.track_from_spotify', ref=t['id']) }}" style="font-weight:600;">{{ t['name'] }}</a>
+                            {% if t['artists'] and t['artists'] != album['artist'] %}<div style="font-size:11px; color:#555;">{{ t['artists'] }}</div>{% endif %}
+                        </td>
+                        <td style="font-family: var(--tahoma); font-size:12px; color:#444;">{{ t['duration'] }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if styles %}
+    <div class="panel">
+        <h3>Styles</h3>
+        <div class="body">
+            <div class="style-chips">
+            {% for s in styles %}
+                <a href="{{ url_for('music.browse', style=s) }}" class="chip">{{ s }}</a>
+            {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if catalog and catalog.videos %}
+    <div class="panel">
+        <h3>Videos</h3>
+        <div class="body">
+            <div class="video-list">
+                {% for v in catalog.videos %}
+                <a href="{{ v.url }}" target="_blank" rel="noopener" class="video-card" title="{{ v.title }}">
+                    <div class="video-thumb">
+                        {% if v.thumb %}
+                            <img src="{{ v.thumb }}" alt="{{ v.title }}" loading="lazy">
+                        {% else %}
+                            <div class="video-nothumb">▶</div>
+                        {% endif %}
+                        <div class="video-play">▶</div>
+                    </div>
+                    <div class="video-title">{{ v.title }}</div>
+                    {% if v.duration %}<div class="video-duration">{{ '%d:%02d'|format(v.duration // 60, v.duration % 60) }}</div>{% endif %}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="panel flat">
+    <h2>All Reviews ({{ reviews|length }})</h2>
+    <div class="body">
+        {% for r in reviews %}
+            <div class="post">
+                <div class="meta">
+                    <span class="who">@{{ r['username'] }}</span>
+                    <span class="stars">{{ r['stars']|stars }}</span>
+                    <span>{{ r['created_at']|datefmt }}</span>
+                    <span class="no">No.{{ '%07d'|format(r['id'] * 1337) }}</span>
+                </div>
+                <div class="body">{{ r['review']|greentext }}</div>
+            </div>
+        {% else %}<em>No written reviews yet.</em>{% endfor %}
+    </div>
+    </div>
+</div>
+
+<div>
+    <div class="panel">
+        <h2>Score Distribution</h2>
+        <div class="body histo">
+            {% for n in [5,4,3,2,1] %}
+                <div class="row">
+                    <div>{{ n }}★</div>
+                    <div class="bar"><span style="width: {{ (histogram[n]/max_h*100)|round(0) }}%;"></span></div>
+                    <div style="text-align:right; color:#666;">{{ histogram[n] }}</div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="panel">
+        <h2>Permalink</h2>
+        <div class="body" style="font-family: var(--tahoma); font-size: 12px; word-break: break-all;">
+            pacer.com{{ url_for('music.album_detail', album_id=album['id']) }}
+        </div>
+    </div>
+</div>
+
+</div>
+
+<script>
+function setRating(value) {
+  document.getElementById('stars-value').value = value;
+  document.querySelectorAll('.star-btn').forEach(function(btn) {
+    btn.classList.remove('active');
+    if (parseFloat(btn.textContent) <= value) {
+      btn.classList.add('active');
+    }
+  });
+  document.getElementById('rating-preview').textContent = (value * 2).toFixed(1) + '/10';
+}
+</script>
+
+{% endblock %}

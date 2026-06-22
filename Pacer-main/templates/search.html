@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Search — Pacer{% endblock %}
+{% block content %}
+<div class="win-panel" style="max-width: 700px; margin: 0 auto;">
+  <div class="panel-title">Search Music</div>
+  <div class="search-box">
+    <input type="text" id="search-input" placeholder="Search releases, artists, albums on the catalog..." autocomplete="off" style="width:100%; padding:6px; border:2px inset #808080;">
+  </div>
+  <div id="search-results" class="search-results"></div>
+</div>
+
+<script>
+(function() {
+  let timer = null;
+  let minDurationTimer = null;
+  const MIN_LOADING_MS = 250;
+  const input = document.getElementById('search-input');
+  const results = document.getElementById('search-results');
+  const escHtml = (s) => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+  function setLoading() {
+    results.classList.add('is-loading');
+    results.innerHTML = '<div class="search-loading"><div class="spinner" aria-hidden="true"></div><span>Searching…</span></div>';
+  }
+  function clearLoading() {
+    results.classList.remove('is-loading');
+  }
+
+  input.addEventListener('input', function() {
+    clearTimeout(timer);
+    clearTimeout(minDurationTimer);
+    const q = this.value.trim();
+    if (q.length < 2) { clearLoading(); results.innerHTML = ''; return; }
+
+    // Abort any in-flight request to avoid race
+    if (window.__pacAbort) { try { window.__pacAbort.abort(); } catch (e) {} }
+    const ctrl = new AbortController();
+    window.__pacAbort = ctrl;
+
+    setLoading();
+    const startedAt = Date.now();
+
+    timer = setTimeout(function() {
+      fetch('/spotify/search?q=' + encodeURIComponent(q), { signal: ctrl.signal })
+        .then(r => r.json())
+        .then(data => {
+          // Stale response — ignore
+          if (ctrl.signal.aborted) return;
+
+          // Enforce minimum visible duration
+          const elapsed = Date.now() - startedAt;
+          const remaining = Math.max(0, MIN_LOADING_MS - elapsed);
+          minDurationTimer = setTimeout(() => {
+            clearLoading();
+            let html = '';
+            if (data.error) {
+              html = '<p class="search-error">' + escHtml(data.error) + '</p>';
+            } else if (data.items && data.items.length) {
+              data.items.forEach(r => {
+                html += '<div class="search-result-item">';
+                // Discogs sometimes returns thumb="" for older / obscure
+                // releases. Use a CSS-only placeholder (vinyl + first letter)
+                // so the row stays proportional even without a real cover.
+                const thumb = (r.thumb || '').trim();
+                if (thumb) {
+                  html += '<img src="' + escHtml(thumb) + '" class="search-result-img" loading="lazy" alt="">';
+                } else {
+                  const initial = escHtml(((r.title || '?').trim().charAt(0) || '?').toUpperCase());
+                  html += '<div class="search-result-img search-result-img-placeholder" aria-hidden="true">' + initial + '</div>';
+                }
+                html += '<div class="search-result-info">';
+                const href = r.discogs_id != null
+                  ? '/album/spotify/' + encodeURIComponent(r.discogs_id)
+                  : '#';
+                html += '<a href="' + escHtml(href) + '" class="search-result-title">' + escHtml(r.title || '') + '</a>';
+                const meta = [r.label, r.year, (r.format || []).join(', ')].filter(Boolean).join(' · ');
+                if (meta) html += '<span class="search-result-meta">' + escHtml(meta) + '</span>';
+                if (r.has_preview && r.spotify_id) {
+                  html += '<button class="search-result-play" data-spotify-id="' + escHtml(r.spotify_id) + '">▶ Play preview</button>';
+                }
+                html += '</div></div>';
+              });
+            }
+            if (!html) html = '<p>No results found.</p>';
+            results.innerHTML = html;
+
+            // Hook up the play buttons to the existing mini player
+            results.querySelectorAll('.search-result-play').forEach(btn => {
+              btn.addEventListener('click', function() {
+                if (typeof playInMini === 'function') {
+                  playInMini(this.dataset.spotifyId, 'preview', 'preview');
+                }
+              });
+            });
+          }, remaining);
+        })
+        .catch(err => {
+          if (err && err.name === 'AbortError') return;
+          clearLoading();
+          results.innerHTML = '<p>Search failed. Please try again.</p>';
+        });
+    }, 300);
+  });
+})();
+</script>
+{% endblock %}

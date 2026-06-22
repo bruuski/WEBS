@@ -1,0 +1,199 @@
+<div class="compose-box win-panel">
+  <div class="panel-title">New Post</div>
+  <form method="POST" action="{{ url_for('feed.create_post') }}" id="compose-form">
+    <textarea name="body" placeholder="What's on your mind?" maxlength="280" rows="3" required></textarea>
+    <input type="hidden" name="song_id" id="compose-song-id" value="">
+    <input type="hidden" name="album_id" id="compose-album-id" value="">
+    <input type="hidden" name="image_cid" id="compose-image-cid" value="">
+    <div id="compose-attachment" class="compose-attachment" style="display:none;">
+      <span id="compose-attachment-text"></span>
+      <button type="button" onclick="clearAttachment()" class="btn-small">&#10005;</button>
+    </div>
+    <div id="compose-image-preview" class="compose-image-preview" style="display:none;">
+      <img id="compose-image-thumb" src="" alt="" style="max-height:80px; border:1px solid #000;">
+      <button type="button" onclick="clearImageAttachment()" class="btn-small">&#10005;</button>
+    </div>
+    <div class="compose-actions">
+      <div class="compose-buttons">
+        <button type="button" onclick="toggleAttachSearch()" class="btn">&#127925; Attach</button>
+        <button type="button" onclick="triggerImageUpload()" class="btn">&#128444; Image</button>
+        <input type="file" id="compose-image-file" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none" onchange="uploadComposeImage(this)">
+      </div>
+      <div>
+        <span class="char-count">280</span>
+        <button type="submit" class="btn">Post</button>
+      </div>
+    </div>
+  </form>
+  <div id="attach-search-panel" class="attach-search-panel" style="display:none;">
+    <input type="text" id="attach-search-input" placeholder="Search song or album..." style="width:100%; padding:4px; border:2px inset #808080; margin-bottom:6px;">
+    <div id="attach-search-results"></div>
+  </div>
+</div>
+
+<script>
+function toggleAttachSearch() {
+  const panel = document.getElementById('attach-search-panel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  if (panel.style.display === 'block') {
+    document.getElementById('attach-search-input').focus();
+  }
+}
+
+function clearAttachment() {
+  document.getElementById('compose-song-id').value = '';
+  document.getElementById('compose-album-id').value = '';
+  document.getElementById('compose-attachment').style.display = 'none';
+  document.getElementById('compose-attachment-text').textContent = '';
+}
+
+function triggerImageUpload() {
+  document.getElementById('compose-image-file').click();
+}
+
+function uploadComposeImage(input) {
+  if (!input.files || !input.files[0]) return;
+  var formData = new FormData();
+  formData.append('file', input.files[0]);
+  fetch('/feed/upload-image', { method: 'POST', body: formData })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.cid) {
+        document.getElementById('compose-image-cid').value = data.cid;
+        var thumb = document.getElementById('compose-image-thumb');
+        thumb.src = URL.createObjectURL(input.files[0]);
+        document.getElementById('compose-image-preview').style.display = 'flex';
+      } else {
+        alert(data.error || 'Upload failed');
+      }
+    });
+}
+
+function clearImageAttachment() {
+  document.getElementById('compose-image-cid').value = '';
+  document.getElementById('compose-image-preview').style.display = 'none';
+  document.getElementById('compose-image-file').value = '';
+}
+
+function triggerReplyImage(id) {
+  document.getElementById('reply-image-file-' + id).click();
+}
+
+function uploadReplyImage(input, id) {
+  if (!input.files || !input.files[0]) return;
+  var formData = new FormData();
+  formData.append('file', input.files[0]);
+  fetch('/feed/upload-image', { method: 'POST', body: formData })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.cid) {
+        document.getElementById('reply-image-cid-' + id).value = data.cid;
+      } else {
+        alert(data.error || 'Upload failed');
+      }
+    });
+}
+
+// Helpers for safe HTML/JS attribute embedding
+function escHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function escJs(s) {
+  return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+// Attach a Discogs release as the first track of the release.
+// Discogs releases don't have a single "song" - they have a tracklist.
+// We create a song from the first track via the deep-link route
+// /track/spotify/<discogs_id>, which the route now treats as
+// "numeric = Discogs release id".
+function attachReleaseAsSong(discogsId, title) {
+  fetch('/track/spotify/' + encodeURIComponent(discogsId), { method: 'GET', redirect: 'follow' })
+    .then(r => {
+      const match = r.url.match(/\/songs\/(\d+)/);
+      if (match) {
+        document.getElementById('compose-song-id').value = match[1];
+        document.getElementById('compose-album-id').value = '';
+        document.getElementById('compose-attachment-text').textContent = '\u{1F3B5} ' + title;
+        document.getElementById('compose-attachment').style.display = 'flex';
+        document.getElementById('attach-search-panel').style.display = 'none';
+      } else {
+        alert("Couldn't resolve that release to a song.");
+      }
+    })
+    .catch(() => alert("Attach failed. Please try again."));
+}
+
+function attachReleaseAsAlbum(discogsId, title) {
+  fetch('/album/spotify/' + encodeURIComponent(discogsId), { method: 'GET', redirect: 'follow' })
+    .then(r => {
+      const match = r.url.match(/\/albums\/(\d+)/);
+      if (match) {
+        document.getElementById('compose-album-id').value = match[1];
+        document.getElementById('compose-song-id').value = '';
+        document.getElementById('compose-attachment-text').textContent = '\u{1F4C0} ' + title;
+        document.getElementById('compose-attachment').style.display = 'flex';
+        document.getElementById('attach-search-panel').style.display = 'none';
+      } else {
+        alert("Couldn't resolve that release to an album.");
+      }
+    })
+    .catch(() => alert("Attach failed. Please try again."));
+}
+
+(function() {
+  let timer = null;
+  const input = document.getElementById('attach-search-input');
+  if (!input) return;
+  const results = document.getElementById('attach-search-results');
+
+  input.addEventListener('input', function() {
+    clearTimeout(timer);
+    const q = this.value.trim();
+    if (q.length < 2) { results.innerHTML = ''; return; }
+    timer = setTimeout(function() {
+      // Show a small loading placeholder
+      results.innerHTML = '<div class="attach-result" style="opacity:0.6;">Searching\u2026</div>';
+      fetch('/spotify/search?q=' + encodeURIComponent(q))
+        .then(r => r.json())
+        .then(data => {
+          let html = '';
+          if (data.error) {
+            html = '<div class="attach-result" style="opacity:0.7;">' + escHtml(data.error) + '</div>';
+          } else {
+            const items = data.items || [];
+            // Discogs returns releases (no track/album kind). Each release has
+            // discogs_id + title. We show the first 5 as "attach as song" and
+            // the first 3 as "attach as album", with a toggle button so the
+            // user can pick.
+            if (items.length) {
+              items.slice(0, 5).forEach(item => {
+                const did = item.discogs_id;
+                if (did == null) return;
+                const title = item.title || '';
+                const meta = [item.label, item.year, (item.format || []).join(', ')]
+                  .filter(Boolean).join(' \u00B7 ');
+                const safeTitle = escJs(title);
+                html += '<div class="attach-result">';
+                html += '  <div class="attach-result-main" onclick="attachReleaseAsSong(\'' + did + '\', \'' + safeTitle + '\')">';
+                html += '    \u{1F3B5} <strong>' + escHtml(title) + '</strong>';
+                if (meta) html += '<div class="attach-meta">' + escHtml(meta) + '</div>';
+                html += '  </div>';
+                html += '  <button type="button" class="btn-small" onclick="attachReleaseAsAlbum(\'' + did + '\', \'' + safeTitle + '\')" title="Attach as album">\u{1F4C0}</button>';
+                html += '</div>';
+              });
+            } else {
+              html = '<div class="attach-result">No results</div>';
+            }
+          }
+          results.innerHTML = html;
+        })
+        .catch(() => {
+          results.innerHTML = '<div class="attach-result">Search failed. Try again.</div>';
+        });
+    }, 300);
+  });
+})();
+</script>

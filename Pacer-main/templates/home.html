@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Pacer — Home{% endblock %}
+{% block content %}
+<div class="feed-layout">
+  <div class="feed-main">
+    {% if current_user %}
+      {% include "partials/compose_box.html" %}
+    {% endif %}
+
+    <div class="feed-timeline">
+      {% for item in feed_items %}
+        {% include "partials/feed_item.html" %}
+      {% endfor %}
+      {% if feed_items|length == 20 %}
+      <div hx-get="{{ url_for('feed.feed_more', offset=20) }}"
+           hx-trigger="revealed"
+           hx-swap="afterend">
+      </div>
+      {% endif %}
+    </div>
+
+    {% if not feed_items %}
+    <div class="win-panel">
+      <p>No posts yet. Be the first to post!</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

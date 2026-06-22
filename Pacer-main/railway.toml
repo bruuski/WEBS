@@ -1,0 +1,20 @@
+# Railway service configuration.
+# This file tells the Railway CLI / dashboard how to deploy Pacer.
+
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+# Start command. The Procfile's `web` process takes precedence, but Railway
+# reads this when generating the start command from the dashboard.
+startCommand = "gunicorn run:app --bind 0.0.0.0:$PORT --workers 2 --timeout 60"
+
+# Restart policy: redeploy on failure, but cap at 3 retries to avoid a crash
+# loop from a misconfigured SECRET_KEY.
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+# Health check — Railway will hit this URL to confirm the deploy succeeded.
+# See pacer/__init__.py::healthz for the implementation.
+healthcheckPath = "/healthz"
+healthcheckTimeout = 30

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Edit Profile — Pacer{% endblock %}
+{% block content %}
+
+<div class="panel">
+<h2>Edit Profile</h2>
+<div class="body">
+<form method="post">
+    <div class="row"><label>Display Name</label><input type="text" name="display_name" value="{{ user['display_name'] or '' }}"></div>
+    <div class="row"><label>Headline / Tagline</label><input type="text" name="headline" value="{{ user['headline'] }}" placeholder="a quote you'd put in your bio"></div>
+    <div class="row"><label>Status Message</label><input type="text" name="status_message" value="{{ user['status_message'] or '' }}" placeholder="what's on your mind?" maxlength="200"></div>
+    <div class="row"><label>Mood</label><input type="text" name="mood" value="{{ user['mood'] }}"></div>
+    <div class="row"><label>Avatar (single character/emoji)</label><input type="text" name="avatar_emoji" maxlength="4" value="{{ user['avatar_emoji'] }}"></div>
+    <div class="row"><label>Location</label><input type="text" name="location" value="{{ user['location'] }}"></div>
+    <div class="row"><label>Age</label><input type="number" name="age" value="{{ user['age'] or '' }}"></div>
+    <div class="row"><label>Favorite Artists (comma-separated)</label><input type="text" name="fav_bands" value="{{ user['fav_bands'] }}"></div>
+    <div class="row"><label>About Me (greentext with &gt;, quote with &gt;&gt;)</label><textarea name="about_me">{{ user['about_me'] }}</textarea></div>
+    <div class="row"><label>Theme</label>
+        <select name="theme">
+            <option value="sky"    {% if user['theme']=='sky'    %}selected{% endif %}>Sky (blue clouds)</option>
+            <option value="sunset" {% if user['theme']=='sunset' %}selected{% endif %}>Sunset (pink/orange)</option>
+            <option value="cyber"  {% if user['theme']=='cyber'  %}selected{% endif %}>Cyber (dark space)</option>
+        </select>
+    </div>
+    <div class="row"><label>Background Preset</label>
+        <select name="background_preset">
+            <option value="" {% if not user['background_preset'] %}selected{% endif %}>None (use theme default)</option>
+            <option value="stars" {% if user['background_preset']=='stars' %}selected{% endif %}>Stars</option>
+            <option value="grid" {% if user['background_preset']=='grid' %}selected{% endif %}>Grid</option>
+            <option value="waves" {% if user['background_preset']=='waves' %}selected{% endif %}>Waves</option>
+            <option value="dots" {% if user['background_preset']=='dots' %}selected{% endif %}>Dots</option>
+        </select>
+    </div>
+    <button type="submit">Save</button>
+    <a class="btn ghost" href="{{ url_for('profile.profile', username=user['username']) }}">Cancel</a>
+</form>
+</div>
+</div>
+
+<div class="panel">
+<h2>Upload Images</h2>
+<div class="body">
+    <form method="post" action="{{ url_for('profile.upload_file') }}" enctype="multipart/form-data" hx-boost="false" style="margin-bottom:16px;">
+        <div class="row"><label>Profile Picture</label><input type="file" name="file" accept="image/jpeg,image/png,image/gif,image/webp"></div>
+        <input type="hidden" name="upload_type" value="profile_pic">
+        <button type="submit">Upload Profile Pic</button>
+        <span style="font-size:11px; color:var(--muted);">jpg/png/gif/webp, max 5MB</span>
+    </form>
+    <form method="post" action="{{ url_for('profile.upload_file') }}" enctype="multipart/form-data" hx-boost="false">
+        <div class="row"><label>Background Image</label><input type="file" name="file" accept="image/jpeg,image/png,image/gif,image/webp"></div>
+        <input type="hidden" name="upload_type" value="background">
+        <button type="submit">Upload Background</button>
+        <span style="font-size:11px; color:var(--muted);">jpg/png/gif/webp, max 5MB</span>
+    </form>
+</div>
+</div>
+
+{% endblock %}

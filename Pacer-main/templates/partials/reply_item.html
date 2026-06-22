@@ -1,0 +1,15 @@
+<div class="reply-item">
+  {% if reply["profile_pic_cid"] %}
+  <img src="{{ ipfs_url(reply['profile_pic_cid']) }}" alt="" class="reply-avatar-img">
+  {% else %}
+  <span class="reply-avatar">{{ reply["avatar_emoji"] or "🎧" }}</span>
+  {% endif %}
+  <div class="reply-content">
+    <a href="{{ url_for('profile.profile', username=reply['username']) }}" class="reply-username">{{ reply["display_name"] or reply["username"] }}</a>
+    <span class="reply-body">{{ reply["body"] }}</span>
+    {% if reply.get("image_cid") %}
+    <img src="{{ ipfs_url(reply['image_cid']) }}" alt="" class="reply-image">
+    {% endif %}
+    <span class="reply-time">{{ reply["created_at"] }}</span>
+  </div>
+</div>

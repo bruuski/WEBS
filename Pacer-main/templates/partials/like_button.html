@@ -1,0 +1,19 @@
+{% if liked %}
+<button class="btn-action btn-liked"
+        hx-post="{{ url_for('feed.unlike_' + item_type, **{item_type + '_id': item_id}) }}"
+        hx-target="this"
+        hx-swap="outerHTML"
+        hx-boost="false"
+        hx-select="unset">
+  &#9829; {{ count }}
+</button>
+{% else %}
+<button class="btn-action"
+        hx-post="{{ url_for('feed.like_' + item_type, **{item_type + '_id': item_id}) }}"
+        hx-target="this"
+        hx-swap="outerHTML"
+        hx-boost="false"
+        hx-select="unset">
+  &#9825; {{ count }}
+</button>
+{% endif %}

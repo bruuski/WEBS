@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}New Playlist — Pacer{% endblock %}
+{% block content %}
+<div class="win-panel" style="max-width: 600px; margin: 0 auto;">
+  <div class="panel-title">Create Playlist</div>
+  <form method="POST" id="create-playlist-form">
+    <div class="form-group">
+      <label>Name</label>
+      <input type="text" name="name" required maxlength="100">
+    </div>
+    <div class="form-group">
+      <label>Description (optional)</label>
+      <textarea name="description" rows="2" maxlength="500"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Add Songs</label>
+      <input type="text" id="playlist-create-search" placeholder="Search for songs to add..." style="width:100%; padding:6px; border:2px inset #808080;" oninput="searchNewPlaylistSong(this.value)">
+      <div id="playlist-create-results" class="playlist-add-results"></div>
+      <div id="playlist-create-selected" class="playlist-selected-songs"></div>
+      <input type="hidden" name="song_ids" id="playlist-create-song-ids" value="">
+    </div>
+
+    <button type="submit" class="btn">Create</button>
+  </form>
+</div>
+
+<script>
+var _newPlaylistSongs = [];
+var _newPlaylistTimer = null;
+
+function escHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function escJs(s) {
+  return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+function searchNewPlaylistSong(q) {
+  clearTimeout(_newPlaylistTimer);
+  var results = document.getElementById('playlist-create-results');
+  if (q.length < 2) { results.innerHTML = ''; return; }
+  _newPlaylistTimer = setTimeout(function() {
+    results.innerHTML = '<div class="attach-result" style="opacity:0.6;">Searching…</div>';
+    fetch('/spotify/search?q=' + encodeURIComponent(q))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var html = '';
+        if (data.error) {
+          html = '<div class="attach-result" style="opacity:0.7;">' + escHtml(data.error) + '</div>';
+        } else {
+          var items = data.items || [];
+          if (items.length) {
+            items.slice(0, 5).forEach(function(item) {
+              var did = item.discogs_id;
+              if (did == null) return;
+              var title = item.title || '';
+              var meta = [item.label, item.year, (item.format || []).join(', ')]
+                .filter(Boolean).join(' · ');
+              var safeTitle = escJs(title);
+              html += '<div class="attach-result" onclick="selectNewPlaylistSong(\'' + did + '\', \'' + safeTitle + '\')">';
+              html += '🎵 <strong>' + escHtml(title) + '</strong>';
+              if (meta) html += '<div class="attach-meta">' + escHtml(meta) + '</div>';
+              html += '</div>';
+            });
+          } else {
+            html = '<div class="attach-result">No results</div>';
+          }
+        }
+        if (!html) html = '<div class="attach-result">No results</div>';
+        results.innerHTML = html;
+      })
+      .catch(function() {
+        results.innerHTML = '<div class="attach-result">Search failed. Try again.</div>';
+      });
+  }, 300);
+}
+
+function selectNewPlaylistSong(discogsId, title) {
+  if (_newPlaylistSongs.find(function(s) { return s.discogsId === discogsId; })) {
+    showToast('Song already added');
+    return;
+  }
+  // Resolve the Discogs release to a local song id via the deep-link route.
+  fetch('/track/spotify/' + encodeURIComponent(discogsId), {method: 'GET', redirect: 'follow'})
+    .then(function(r) {
+      var match = r.url.match(/\/songs\/(\d+)/);
+      if (match) {
+        var localId = parseInt(match[1]);
+        _newPlaylistSongs.push({ discogsId: discogsId, localId: localId, title: title });
+        renderSelectedSongs();
+        document.getElementById('playlist-create-results').innerHTML = '';
+        document.getElementById('playlist-create-search').value = '';
+      } else {
+        showToast("Couldn't resolve that release to a song.");
+      }
+    })
+    .catch(function() { showToast("Attach failed. Please try again."); });
+}
+
+function removeNewPlaylistSong(index) {
+  _newPlaylistSongs.splice(index, 1);
+  renderSelectedSongs();
+}
+
+function renderSelectedSongs() {
+  var container = document.getElementById('playlist-create-selected');
+  var html = '';
+  _newPlaylistSongs.forEach(function(s, i) {
+    html += '<div class="playlist-selected-item">';
+    html += '<span>🎵 ' + s.title + '</span>';
+    html += '<button type="button" onclick="removeNewPlaylistSong(' + i + ')" class="btn-small">✕</button>';
+    html += '</div>';
+  });
+  container.innerHTML = html;
+  document.getElementById('playlist-create-song-ids').value = _newPlaylistSongs.map(function(s) { return s.localId; }).join(',');
+}
+</script>
+{% endblock %}

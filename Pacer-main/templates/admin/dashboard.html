@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Admin — Pacer{% endblock %}
+{% block content %}
+<div class="win-panel" style="max-width: 800px; margin: 0 auto;">
+  <div class="panel-title">Admin Dashboard</div>
+  <p><a href="{{ url_for('admin.run_sql') }}">Run SQL Query</a></p>
+  <table class="songlist">
+    <thead><tr><th>Table</th><th>Rows</th><th></th></tr></thead>
+    <tbody>
+    {% for t in tables %}
+      <tr>
+        <td><strong>{{ t["name"] }}</strong></td>
+        <td>{{ stats[t["name"]] }}</td>
+        <td><a href="{{ url_for('admin.view_table', table_name=t['name']) }}">View</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  {% if cache_stats %}
+  <section class="admin-cache-stats">
+    <h3>Cache Stats</h3>
+    <dl>
+      {% if cache_stats.spotify_preview_cache %}
+      <dt>Spotify preview cache</dt>
+      <dd>
+        {{ cache_stats.spotify_preview_cache.rows }} rows ·
+        oldest: {{ cache_stats.spotify_preview_cache.oldest or '—' }} ·
+        newest: {{ cache_stats.spotify_preview_cache.newest or '—' }}
+      </dd>
+      {% endif %}
+      {% if cache_stats.artists %}
+      <dt>Artists with catalog data</dt>
+      <dd>
+        {{ cache_stats.artists.with_discogs_id }} of {{ cache_stats.artists.rows }}
+        ({{ "%.0f"|format(100 * cache_stats.artists.with_discogs_id / cache_stats.artists.rows) if cache_stats.artists.rows else 0 }}%)
+      </dd>
+      {% endif %}
+    </dl>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

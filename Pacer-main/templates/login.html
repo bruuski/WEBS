@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Log In — Pacer{% endblock %}
+{% block content %}
+
+<div class="cols two">
+
+<div>
+<div class="panel">
+<h2>Log In</h2>
+<div class="body">
+    <form method="post">
+        <div class="row"><label>Username</label><input type="text" name="username" required autocomplete="username"></div>
+        <div class="row"><label>Password</label><input type="password" name="password" required autocomplete="current-password"></div>
+        <button type="submit">Log In</button>
+    </form>
+    <hr class="divider">
+    <p style="font-family: var(--mono); font-size: 12px;">No account? <a href="{{ url_for('auth.signup') }}">Sign up here.</a></p>
+</div>
+</div>
+</div>
+
+<div>
+<div class="panel">
+<h2>Demo Accounts</h2>
+<div class="body" style="font-family: var(--mono); font-size: 12px;">
+    <p>Password = <code>password</code> for all, except <code>tom</code>:<code>myspace</code></p>
+    <ul style="padding-left: 18px;">
+        <li>tom</li><li>brunette</li><li>joey</li>
+        <li>kamal</li><li>dustyn</li><li>layouts</li><li>anon</li>
+    </ul>
+</div>
+</div>
+</div>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}SQL — Admin{% endblock %}
+{% block content %}
+<div class="win-panel" style="max-width: 900px; margin: 0 auto;">
+  <div class="panel-title">Run SQL</div>
+  <p><a href="{{ url_for('admin.dashboard') }}">← Back to tables</a></p>
+  <form method="POST" hx-boost="false">
+    <textarea name="query" rows="4" style="width:100%; font-family:monospace; font-size:12px; border:2px inset #808080; padding:6px;">{{ query }}</textarea>
+    <button type="submit" class="btn" style="margin-top:6px;">Execute</button>
+  </form>
+  {% if error %}
+  <div style="color:red; margin-top:8px; font-family:monospace; font-size:12px;">Error: {{ error }}</div>
+  {% endif %}
+  {% if results %}
+  <div style="overflow-x:auto; margin-top:12px;">
+    <table class="songlist" style="font-size:11px;">
+      <thead><tr>{% for col in columns %}<th>{{ col }}</th>{% endfor %}</tr></thead>
+      <tbody>
+      {% for row in results %}
+        <tr>{% for col in columns %}<td style="max-width:200px; overflow:hidden; text-overflow:ellipsis;">{{ row[col] }}</td>{% endfor %}</tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

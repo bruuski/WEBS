@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ playlist["name"] }} — Pacer{% endblock %}
+{% block content %}
+<div class="win-panel">
+  <div class="panel-title">{{ playlist["name"] }}</div>
+  <p>by <a href="{{ url_for('profile.profile', username=owner['username']) }}">{{ owner["display_name"] or owner["username"] }}</a> · {{ tracks|length }} tracks</p>
+  {% if playlist["description"] %}<p>{{ playlist["description"] }}</p>{% endif %}
+  <ol class="playlist-tracks">
+    {% for track in tracks %}
+    <li>
+      <a href="{{ url_for('music.song_detail', song_id=track['id']) }}">{{ track["title"] }}</a>
+      <span class="track-artist">{{ track["artist"] }}</span>
+      {% if track["spotify_id"] %}
+      <button class="btn-play-mini" onclick="playInMini('{{ track['spotify_id'] }}', '{{ track['title']|e }}', '{{ track['artist']|e }}')">&#9654;</button>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+</div>
+
+{% if current_user and current_user["id"] == playlist["user_id"] %}
+<div class="panel" style="margin-top: 12px;">
+    <h2>Add Songs</h2>
+    <div class="body">
+        <input type="text" id="playlist-add-search" placeholder="Search for a song..." style="width:100%; padding:6px; border:2px inset #808080;" oninput="searchPlaylistSong(this.value, {{ playlist['id'] }})">
+        <div id="playlist-add-results" class="playlist-add-results"></div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

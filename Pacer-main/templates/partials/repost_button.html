@@ -1,0 +1,19 @@
+{% if reposted %}
+<button class="btn-action btn-reposted"
+        hx-post="{{ url_for('feed.unrepost_' + item_type, **{item_type + '_id': item_id}) }}"
+        hx-target="this"
+        hx-swap="outerHTML"
+        hx-boost="false"
+        hx-select="unset">
+  &#128257; {{ count }}
+</button>
+{% else %}
+<button class="btn-action"
+        hx-post="{{ url_for('feed.repost_' + item_type, **{item_type + '_id': item_id}) }}"
+        hx-target="this"
+        hx-swap="outerHTML"
+        hx-boost="false"
+        hx-select="unset">
+  &#128257; {{ count }}
+</button>
+{% endif %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Sign Up — Pacer{% endblock %}
+{% block content %}
+
+<div class="cols two">
+
+<div>
+<div class="panel">
+<h2>Create Account</h2>
+<div class="body">
+    <form method="post">
+        <div class="row"><label>Username *</label><input type="text" name="username" required autocomplete="username"></div>
+        <div class="row"><label>Password *</label><input type="password" name="password" required autocomplete="new-password"></div>
+        <div class="row"><label>Display Name</label><input type="text" name="display_name"></div>
+        <div class="row"><label>Location</label><input type="text" name="location" placeholder="city, country"></div>
+        <div class="row"><label>Age</label><input type="number" name="age" min="13" max="120"></div>
+        <div class="row"><label>Favorite Artists</label><input type="text" name="fav_bands" placeholder="comma-separated"></div>
+        <div class="row"><label>Theme</label>
+            <select name="theme">
+                <option value="sky">Sky (blue clouds)</option>
+                <option value="sunset">Sunset (pink / orange)</option>
+                <option value="cyber">Cyber (dark space)</option>
+            </select>
+        </div>
+        <button type="submit">Create Account</button>
+    </form>
+</div>
+</div>
+</div>
+
+<div>
+<div class="panel">
+<h2>Why Pacer</h2>
+<div class="body editorial" style="font-size: 15px;">
+    <p>Rate any song from 1 to 5 stars. Write a review when you have something to say. Search Spotify, link your account, see what you actually listen to.</p>
+    <p style="font-family: var(--mono); font-size: 12px; color: var(--muted);">No ads. No algorithm. Just text and numbers.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+{% endblock %}

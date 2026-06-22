@@ -1,0 +1,21 @@
+# Nixpacks build configuration for Railway.
+# Railway auto-detects Python projects, but pinning the build steps here
+# keeps the deployment deterministic and explicit.
+
+[build]
+# Pacer uses Python 3.13 — declared in runtime.txt.
+cmd = "pip install -r requirements.txt"
+
+[start]
+# Procfile takes precedence, but this is a sane default.
+cmd = "gunicorn run:app --bind 0.0.0.0:$PORT --workers 2 --timeout 60"
+
+[variables]
+# Set these in the Railway dashboard (see DEPLOYMENT.md). Listed here for
+# documentation only — Railway will not apply them automatically.
+# PACER_SECRET = "CHANGE-ME-long-random-string"
+# DISCOGS_CONSUMER_KEY = ""
+# DISCOGS_CONSUMER_SECRET = ""
+# SPOTIFY_CLIENT_ID = ""
+# SPOTIFY_CLIENT_SECRET = ""
+# DATA_DIR = "/data"

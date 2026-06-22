@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block title %}{{ artist['name'] }} — Artist — Pacer{% endblock %}
+{% block content %}
+
+<div class="feature">
+    <div class="titlebar"><span>{{ artist['name'] }} — Artist</span></div>
+    <div class="inner">
+        <div>
+            <div class="kicker">Artist</div>
+            <h1 class="song-title" style="margin:0;">{{ artist['name'] }}</h1>
+            {% if artist['genres'] %}
+            <div class="artist-genres">
+                {% for genre in artist['genres'].split(',') %}
+                    <span class="artist-tag">{{ genre.strip() }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div class="song-meta" style="margin-top:8px;">
+                Popularity: {{ artist['popularity'] }}/100
+                {% if artist['spotify_url'] %} · <a href="{{ artist['spotify_url'] }}" target="_blank" rel="noopener">Open in Spotify ↗</a>{% endif %}
+            </div>
+
+{% if artist_info %}
+<div class="artist-bio">
+  {% if artist_info.real_name and artist_info.real_name != artist_info.name %}
+  <p class="realname">aka <strong>{{ artist_info.real_name }}</strong></p>
+  {% endif %}
+  {% if artist_info.profile %}
+  <div class="profile-text">{{ artist_info.profile }}</div>
+  {% endif %}
+  {% if artist_info.members %}
+  <p class="members"><strong>Members:</strong> {{ artist_info.members|join(', ') }}</p>
+  {% endif %}
+  {% if artist_info.aliases %}
+  <p class="aliases"><strong>Also known as:</strong> {{ artist_info.aliases|join(', ') }}</p>
+  {% endif %}
+  {% if artist_info.urls %}
+  <p class="urls">
+    {% for u in artist_info.urls %}
+    <a href="{{ u }}" target="_blank" rel="noopener" class="ext-link">{{ u }}</a>{% if not loop.last %} · {% endif %}
+    {% endfor %}
+  </p>
+  {% endif %}
+  {% if artist_info.discogs_url %}
+  <a href="{{ artist_info.discogs_url }}" target="_blank" rel="noopener" class="ext-link">
+    View artist on catalog ↗
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+        </div>
+        <div class="cover">
+            {% if artist['image_url'] %}<img src="{{ artist['image_url'] }}" alt="{{ artist['name'] }}">{% else %}no image{% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="panel">
+    <h2>Community Ratings</h2>
+    <div class="body">
+        <div class="artist-ratings">
+            <div class="artist-rating-block">
+                <div class="artist-rating-label">Avg Song Rating</div>
+                {% if avg_song_rating and avg_song_rating['avg_stars'] %}
+                    <div class="score">{{ avg_song_rating['avg_stars']|score10 }}<span class="max">/10</span></div>
+                    <div class="song-meta">{{ avg_song_rating['total_ratings'] }} rating{{ '' if avg_song_rating['total_ratings'] == 1 else 's' }}</div>
+                {% else %}
+                    <div class="song-meta">No ratings yet</div>
+                {% endif %}
+            </div>
+            <div class="artist-rating-block">
+                <div class="artist-rating-label">Avg Album Rating</div>
+                {% if avg_album_rating and avg_album_rating['avg_stars'] %}
+                    <div class="score">{{ avg_album_rating['avg_stars']|score10 }}<span class="max">/10</span></div>
+                    <div class="song-meta">{{ avg_album_rating['total_ratings'] }} rating{{ '' if avg_album_rating['total_ratings'] == 1 else 's' }}</div>
+                {% else %}
+                    <div class="song-meta">No ratings yet</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if top_tracks %}
+<div class="panel">
+    <h2>Top Tracks</h2>
+    <div class="body" style="padding:0;">
+        <table class="songlist">
+            <thead><tr><th style="width:32px;">#</th><th>Title</th><th>Album</th><th>Length</th></tr></thead>
+            <tbody>
+            {% for track in top_tracks[:10] %}
+                <tr>
+                    <td><span class="num">{{ loop.index }}</span></td>
+                    <td>
+                        <button class="btn-play-mini"
+                                onclick="playInMini('{{ track['spotify_id'] }}', '{{ track['name']|e }}', '{{ artist['name']|e }}')">
+                          &#9654;
+                        </button>
+                        <a href="{{ url_for('music.track_from_spotify', ref=track['spotify_id']) }}" style="font-weight:600;">{{ track['name'] }}</a>
+                    </td>
+                    <td style="font-size:12px; color:#555;">{{ track['album_name'] }}</td>
+                    <td style="font-family: var(--tahoma); font-size:12px; color:#444;">{{ '%d:%02d'|format(track['duration_ms'] // 60000, (track['duration_ms'] % 60000) // 1000) }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if albums %}
+<div class="panel">
+    <h2>Discography ({{ albums|length }})</h2>
+    <div class="body">
+        <div class="artist-discography">
+            {% for album in albums %}
+            {% if album['spotify_id'] or album['discogs_release_id'] %}
+            <a href="{{ url_for('music.album_from_spotify', ref=album['spotify_id'] or album['discogs_release_id']) }}" class="artist-album-card">
+                <div class="artist-album-cover">
+                    {% if album['cover_image'] or album['spotify_image'] %}
+                        <img src="{{ album['cover_image'] or album['spotify_image'] }}" alt="{{ album['name'] }}">
+                    {% else %}
+                        <div class="artist-album-nocover">No Cover</div>
+                    {% endif %}
+                </div>
+                <div class="artist-album-name">{{ album['name'] }}</div>
+                <div class="artist-album-year">{{ album['year'] or '' }}{% if album['format'] %} · {{ album['format'] }}{% endif %}</div>
+            </a>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<style>
+.artist-genres {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+}
+.artist-tag {
+    background: var(--accent, #1db954);
+    color: #fff;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-family: var(--tahoma);
+}
+.artist-ratings {
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+}
+.artist-rating-block {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.artist-rating-label {
+    font-family: var(--tahoma);
+    font-size: 12px;
+    font-weight: 600;
+    color: #333;
+}
+.artist-discography {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 16px;
+}
+.artist-album-card {
+    text-decoration: none;
+    color: inherit;
+    text-align: center;
+}
+.artist-album-card:hover {
+    opacity: 0.85;
+}
+.artist-album-cover img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border: 2px solid #000;
+}
+.artist-album-nocover {
+    width: 100%;
+    aspect-ratio: 1;
+    background: #ccc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    border: 2px solid #000;
+}
+.artist-album-name {
+    font-family: var(--tahoma);
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.artist-album-year {
+    font-family: var(--tahoma);
+    font-size: 11px;
+    color: #666;
+}
+</style>
+
+{% endblock %}
