@@ -64,14 +64,6 @@ SPOTIFY_CLIENT_ID = os.environ.get("SPOTIFY_CLIENT_ID", "")
 SPOTIFY_CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
 SPOTIFY_TRENDING_PLAYLIST = os.environ.get("SPOTIFY_TRENDING_PLAYLIST", "37i9dQZF1DXcBWIGoYBM5M")
 
-# Discogs (OAuth 1.0a server-to-server)
-DISCOGS_CONSUMER_KEY    = os.environ.get("DISCOGS_CONSUMER_KEY", "")
-DISCOGS_CONSUMER_SECRET = os.environ.get("DISCOGS_CONSUMER_SECRET", "")
-DISCOGS_USER_AGENT      = os.environ.get(
-    "DISCOGS_USER_AGENT",
-    "Pacer/1.0 +https://github.com/0xzhepyr/Pacer",
-)
-
 # Pinata (optional, for IPFS uploads of profile pics / post images)
 PINATA_API_KEY    = os.environ.get("PINATA_API_KEY", "")
 PINATA_SECRET_KEY = os.environ.get("PINATA_SECRET_KEY", "")
